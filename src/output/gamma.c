@@ -4,6 +4,7 @@
 //
 // SPDX-License-Identifier: GPL-1.0-or-later
 
+#include <math.h>
 #include <stdlib.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/render/color.h>
@@ -276,9 +277,14 @@ static void interpolate_clolor(float a, const float *c1, const float *c2, float 
     c[2] = (1.0 - a) * c1[2] + a * c2[2];
 }
 
+/**
+ * Fill the ramp on top of base_ramp (the table of a wlr-gamma-control client,
+ * or linear), then apply the per-channel gamma (xrandr convention, > 1.0 is
+ * brighter), and finally the built-in color temperature and brightness.
+ */
 static void fill_gamma_ramp_with_colortemp(uint16_t *gamma_ramp, uint32_t ramp_size,
-                                           const uint16_t *base_ramp, uint32_t color_temp,
-                                           uint32_t brightness)
+                                           const uint16_t *base_ramp, const float *gamma,
+                                           uint32_t color_temp, uint32_t brightness)
 {
     /* approximate white point */
     float whitepoint[3];
@@ -293,9 +299,16 @@ static void fill_gamma_ramp_with_colortemp(uint16_t *gamma_ramp, uint32_t ramp_s
     for (uint32_t c = 0; c < 3; c++) {
         uint16_t *ramp = &gamma_ramp[c * ramp_size];
         double factor = whitepoint[c] * _brightness;
+        double exponent = 1.0;
+        if (gamma && output_gamma_is_valid(gamma[c])) {
+            exponent = 1.0 / gamma[c];
+        }
         for (uint32_t i = 0; i < ramp_size; i++) {
             double value = base_ramp ? (double)base_ramp[c * ramp_size + i] / UINT16_MAX
                                      : (double)i / ramp_size;
+            if (exponent != 1.0) {
+                value = pow(value, exponent);
+            }
             value *= factor;
             ramp[i] = value >= 1.0 ? UINT16_MAX : value * (UINT16_MAX + 1);
         }
@@ -303,8 +316,8 @@ static void fill_gamma_ramp_with_colortemp(uint16_t *gamma_ramp, uint32_t ramp_s
 }
 
 bool output_set_gamma_lut(struct wlr_output *wlr_output, size_t gamma_size,
-                          struct wlr_output_state *wlr_state, uint32_t color_temp,
-                          uint32_t brightness)
+                          struct wlr_output_state *wlr_state, const float *gamma,
+                          uint32_t color_temp, uint32_t brightness)
 {
     /* A client may change the gamma base ramp, so keep night light mode over it. */
     struct wlr_gamma_control_v1 *control = output_get_gamma_control(wlr_output);
@@ -323,7 +336,8 @@ bool output_set_gamma_lut(struct wlr_output *wlr_output, size_t gamma_size,
     if (!gamma_ramp) {
         return false;
     }
-    fill_gamma_ramp_with_colortemp(gamma_ramp, gamma_size, base_ramp, color_temp, brightness);
+    fill_gamma_ramp_with_colortemp(gamma_ramp, gamma_size, base_ramp, gamma, color_temp,
+                                   brightness);
     struct wlr_color_transform *transform = wlr_color_transform_init_lut_3x1d(
         gamma_size, gamma_ramp, gamma_ramp + gamma_size, gamma_ramp + 2 * gamma_size);
     free(gamma_ramp);
@@ -335,6 +349,41 @@ bool output_set_gamma_lut(struct wlr_output *wlr_output, size_t gamma_size,
 
     kywc_log(KYWC_DEBUG, "output:%s set gamma lut colr_tempe: %d%s", wlr_output->name, color_temp,
              base_ramp ? " with client gamma" : "");
+    return true;
+}
+
+bool output_gamma_is_valid(double value)
+{
+    return isfinite(value) && value >= OUTPUT_GAMMA_MIN && value <= OUTPUT_GAMMA_MAX;
+}
+
+bool output_set_gamma(struct output *output, const float gamma[3])
+{
+    for (int i = 0; i < 3; i++) {
+        if (!output_gamma_is_valid(gamma[i])) {
+            return false;
+        }
+    }
+
+    if (output->gamma[0] == gamma[0] && output->gamma[1] == gamma[1] &&
+        output->gamma[2] == gamma[2]) {
+        return true;
+    }
+
+    output->gamma[0] = gamma[0];
+    output->gamma[1] = gamma[1];
+    output->gamma[2] = gamma[2];
+    output_write_config(output);
+
+    kywc_log(KYWC_INFO, "output:%s set gamma %.3f:%.3f:%.3f", output->base.name, gamma[0],
+             gamma[1], gamma[2]);
+
+    /* if the output is off, it is applied when the output is enabled again */
+    if (output->base.state.enabled) {
+        output_update_gamma(output);
+    } else {
+        output->gamma_changed = true;
+    }
     return true;
 }
 

@@ -1,5 +1,7 @@
 target_sources(flakewm PRIVATE
   gamma.c
+  gamma_dbus.c
+  night_mode.c
   config.c
   layout.c
   modes.c
