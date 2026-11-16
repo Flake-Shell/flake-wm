@@ -43,6 +43,21 @@ struct output *output_from_wlr_output(struct wlr_output *wlr_output)
     return wlr_output->data;
 }
 
+struct output *output_find_by_wlr_output(struct wlr_output *wlr_output)
+{
+    if (!output_manager) {
+        return NULL;
+    }
+
+    struct output *output;
+    wl_list_for_each(output, &output_manager->outputs, link) {
+        if (output->wlr_output == wlr_output) {
+            return output;
+        }
+    }
+    return NULL;
+}
+
 static void handle_server_destroy(struct wl_listener *listener, void *data)
 {
     wl_list_remove(&output_manager->server_destroy.link);
@@ -1183,6 +1198,7 @@ struct output_manager *output_manager_create(struct server *server)
     kde_output_management_create(server);
     wlr_output_management_create(server);
     ukui_output_management_create(server);
+    output_gamma_control_create(server);
 
     char *env = getenv("KYWC_SOFTWARE_GAMMA");
     output_manager->force_software_gamma = (env && strcmp(env, "1") == 0);

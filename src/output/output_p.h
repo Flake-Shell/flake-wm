@@ -56,6 +56,12 @@ bool output_set_gamma_lut(struct wlr_output *wlr_output, size_t gamma_size,
                           struct wlr_output_state *wlr_state, uint32_t color_temp,
                           uint32_t brightness);
 
+struct output *output_find_by_wlr_output(struct wlr_output *wlr_output);
+
+struct wlr_gamma_control_v1 *output_get_gamma_control(struct wlr_output *wlr_output);
+
+bool output_gamma_control_create(struct server *server);
+
 void output_set_pending_primary(struct output *output);
 
 void output_add_common_modes(struct output *output);
