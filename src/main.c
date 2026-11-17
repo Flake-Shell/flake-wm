@@ -39,10 +39,17 @@ static struct wl_event_source *session_xwayland_timeout = NULL;
 static int child_pipe[2] = {-1, -1};
 static struct wl_event_source *child_source;
 
+/* The hyprland UNIX IPC arg is so long that it cannot be held in char. */
+enum {
+    OPT_HYPR_UNIX_SOCKET_SIM = 0x100,
+};
+
 static const struct option long_options[] = {
     { "help", no_argument, NULL, 'h' },    { "debug", no_argument, NULL, 'd' },
     { "version", no_argument, NULL, 'v' }, { "session", required_argument, NULL, 's' },
-    { "verbose", no_argument, NULL, 'V' }, { 0, 0, 0, 0 },
+    { "verbose", no_argument, NULL, 'V' },
+    { "hypr-unix-socket-sim-enable", no_argument, NULL, OPT_HYPR_UNIX_SOCKET_SIM },
+    { 0, 0, 0, 0 },
 };
 
 static const char usage[] =
@@ -54,6 +61,9 @@ static const char usage[] =
     "  -s, --session <process>  Run session on startup.\n"
     "  -v, --version            Show the version number and quit.\n"
     "  -V, --verbose            Enables more verbose logging.\n"
+    "      --hypr-unix-socket-sim-enable\n"
+    "                           Serve Hyprland-compatible IPC sockets and export\n"
+    "                           HYPRLAND_INSTANCE_SIGNATURE (off by default).\n"
     "\n";
 
 static bool detect_suid(void)
@@ -303,6 +313,9 @@ int main(int argc, char *argv[])
             break;
         case 'V': // verbose
             enable_verbose = true;
+            break;
+        case OPT_HYPR_UNIX_SOCKET_SIM:
+            server.options.enable_hypr_unix_socket_sim = true;
             break;
         default:
             fprintf(stderr, "%s", usage);

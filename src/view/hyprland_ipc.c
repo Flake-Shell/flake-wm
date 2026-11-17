@@ -1,32 +1,12 @@
 // SPDX-FileCopyrightText: 2026 CharOfString <root@charofstring.cc>
 // SPDX-License-Identifier: GPL-3.0-or-later
-//
-// Hyprland-compatible IPC.
-//
-// Exposes the two Hyprland UNIX sockets so shells written against Hyprland
-// (Husky-Panel, waybar, quickshell, hyprctl, eww scripts, ...) work on flakewm:
-//
-//   $XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock
-//       one request per connection ("[flags]/command args"), reply, close.
-//   $XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock
-//       event stream, one "EVENT>>DATA\n" line per event.
-//
-// Model mapping:
-//   window    = mapped view with role NORMAL that belongs to a workspace
-//   workspace = flakewm workspace; id = position + 1, name = id unless the
-//               user gave it a custom name. Workspaces span all outputs, so
-//               every monitor reports the current workspace as active and
-//               workspaces report the primary output as their monitor.
-//   monitor   = enabled kywc_output, ids are the smallest free index.
-//
-// Events are not emitted from inside compositor signal handlers. Handlers only
-// schedule an idle reconcile, which diffs the live state against what was last
-// announced and emits the Hyprland events in Hyprland order. This keeps the
-// stream consistent through multi-step changes (workspace deletion renumbers
-// and moves windows, outputs reconfigure in several steps, ...).
-//
-// Set FLAKEWM_HYPRLAND_IPC=0 to disable.
 
+/* This feat simulates Hyprland's UNIX IPC socket.
+ * Hyprland's IPC socket exposes lots of WM's internal info to your system.
+ * It also exposes WM control to programs like hyprctl.
+ * You'll have to start with --hypr-unix-socket-sim-enable and please only start it when you HAVE TO.
+ * The arg is intentionally designed to be super long to force you think "Should I do so?"
+ */
 #define _GNU_SOURCE
 
 #include <errno.h>
@@ -2452,9 +2432,7 @@ static bool track_existing_output(struct kywc_output *output, int index, void *d
 
 bool hyprland_ipc_create(struct view_manager *view_manager)
 {
-    const char *env = getenv("FLAKEWM_HYPRLAND_IPC");
-    if (env && (!strcmp(env, "0") || !strcasecmp(env, "false") || !strcasecmp(env, "off"))) {
-        kywc_log(KYWC_INFO, "hyprland ipc: disabled by FLAKEWM_HYPRLAND_IPC");
+    if (!view_manager->server->options.enable_hypr_unix_socket_sim) {
         return false;
     }
 

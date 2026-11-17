@@ -21,6 +21,8 @@ struct server {
         bool log_in_realtime;
         /* Mutual binding, living and dying together */
         bool binding_session;
+        /* Hyprland-compatible IPC sockets. */
+        bool enable_hypr_unix_socket_sim;
     } options;
 
     struct {
