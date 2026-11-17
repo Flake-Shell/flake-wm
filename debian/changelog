@@ -1,3 +1,10 @@
+flakewm (3.0.4-gxde2) lizhi; urgency=medium
+
+  * 新增对Gamma的支持
+  * 新增护眼模式
+
+ -- CharOfString <root@charofstring.cc>  Mon, 16 Nov 2026 23:58:13 -0600
+
 flakewm (3.0.4-gxde1) lizhi; urgency=medium
 
   * 更新翻译文件
