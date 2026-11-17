@@ -1,6 +1,6 @@
 # Maintainer: CharOfString <root@charofstring.cc>
-pkgbase=flakewm-git
-pkgname=('flakewm-git' 'flakewm-client-git' 'gxde-flake-session-git')
+pkgbase=flakewm
+pkgname=('flakewm' 'flakewm-client' 'gxde-flake-session')
 pkgver=3.0.4
 pkgrel=2
 pkgdesc='GXDE Wayland compositor'
@@ -49,13 +49,14 @@ _pick() {
   done
 }
 
-package_flakewm-git() {
+package_flakewm() {
   depends=('cairo' 'glib2' 'json-c' 'libdisplay-info' 'libdrm' 'libepoxy' 'libglvnd' 'libinput'
            'libjpeg-turbo' 'libliftoff' 'libpng' 'librsvg' 'libunwind' 'libxcb' 'libxkbcommon' 'mesa'
            'openssl' 'pango' 'pixman' 'seatd' 'systemd-libs' 'vulkan-icd-loader' 'wayland' 'xcb-util-errors'
            'xcb-util-renderutil' 'xcb-util-wm' 'xorg-xwayland' 'libgcc' 'libstdc++' 'glibc')
-  provides=('flakewm')
-  conflicts=('flakewm')
+  provides=("flakewm-git=$pkgver")
+  conflicts=('flakewm-git')
+  replaces=('flakewm-git')
 
   # 系统库版本过旧时 CMake 才会构建私有副本，放在 /usr/lib/flakewm ・ CMake only builds private copies into /usr/lib/flakewm when the system ones are too old.
   _pick usr/bin/flakewm usr/share/locale usr/share/flakewm usr/lib/udev/rules.d etc/flakewm \
@@ -66,22 +67,24 @@ package_flakewm-git() {
   install -Dm644 "$(_srcroot)"/LICENSES/{MIT-CMU,MulanPSL-2.0}.txt -t "$pkgdir/usr/share/licenses/$pkgname/"
 }
 
-package_flakewm-client-git() {
+package_flakewm-client() {
   pkgdesc='Client library of the GXDE Wayland compositor'
   # Debian 把开发文件放在同一个包里，这里一样 ・ As on Debian, the development files stay in this package.
   depends=('wayland' 'libgcc' 'libstdc++' 'glibc')
-  provides=('flakewm-client')
-  conflicts=('flakewm-client')
+  provides=("flakewm-client-git=$pkgver")
+  conflicts=('flakewm-client-git')
+  replaces=('flakewm-client-git')
 
   cd "$srcdir/root"
   _pick usr/lib/libflakewm-client.so* usr/include usr/lib/pkgconfig
 }
 
-package_gxde-flake-session-git() {
+package_gxde-flake-session() {
   pkgdesc='GXDE session on the Flake Wayland compositor'
-  depends=("flakewm-git=$pkgver-$pkgrel" 'bash')
-  provides=('gxde-flake-session')
-  conflicts=('gxde-flake-session')
+  depends=("flakewm=$pkgver-$pkgrel" 'bash')
+  provides=("gxde-flake-session-git=$pkgver")
+  conflicts=('gxde-flake-session-git')
+  replaces=('gxde-flake-session-git')
 
   _pick usr/bin/startflakewm usr/share/wayland-sessions/gxde-flakewm.desktop
 }
