@@ -149,7 +149,7 @@ struct hypr_ipc {
     struct server *server;
 
     char *dir;
-    char *request_path, *event_path;
+    char *request_path, *event_path, *lock_path;
     char signature[96];
     int request_fd, event_fd;
     struct wl_event_source *request_source, *event_source;
@@ -2280,6 +2280,9 @@ static void close_sockets(struct hypr_ipc *ipc)
         ipc->event_fd = -1;
         unlink(ipc->event_path);
     }
+    if (ipc->lock_path) {
+        unlink(ipc->lock_path);
+    }
     if (ipc->dir) {
         rmdir(ipc->dir);
     }
@@ -2341,11 +2344,33 @@ static bool open_sockets(struct hypr_ipc *ipc)
     return ipc->request_source && ipc->event_source;
 }
 
+/* "<pid>\n<wayland display>\n", read by `hyprctl instances` and -i */
+static void write_lock(struct hypr_ipc *ipc)
+{
+    const char *display = getenv("WAYLAND_DISPLAY");
+    if (!ipc->dir || !display || asprintf(&ipc->lock_path, "%s/hyprland.lock", ipc->dir) < 0) {
+        ipc->lock_path = NULL;
+        return;
+    }
+    FILE *file = fopen(ipc->lock_path, "we");
+    if (!file) {
+        kywc_log_errno(KYWC_WARN, "hyprland ipc: unable to write %s", ipc->lock_path);
+        free(ipc->lock_path);
+        ipc->lock_path = NULL;
+        return;
+    }
+    fprintf(file, "%d\n%s\n", (int)getpid(), display);
+    fclose(file);
+}
+
 static void handle_server_start(struct wl_listener *listener, void *data)
 {
     struct hypr_ipc *ipc = wl_container_of(listener, ipc, server_start);
     wl_list_remove(&ipc->server_start.link);
     wl_list_init(&ipc->server_start.link);
+
+    /* WAYLAND_DISPLAY is only known once the server has started */
+    write_lock(ipc);
 
     /* for applications started through D-Bus or systemd --user */
     dbus_update_activation_environment("HYPRLAND_INSTANCE_SIGNATURE", ipc->signature);
@@ -2419,6 +2444,7 @@ static void handle_server_destroy(struct wl_listener *listener, void *data)
 
     free(ipc->request_path);
     free(ipc->event_path);
+    free(ipc->lock_path);
     free(ipc->dir);
     free(ipc);
     hypr_ipc = NULL;
