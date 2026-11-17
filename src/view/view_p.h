@@ -199,6 +199,9 @@ bool treeland_personalization_apply_view_popup_effects(struct view *view);
 
 bool ky_workspace_manager_create(struct server *server);
 
+/* Hyprland-compatible IPC sockets ($XDG_RUNTIME_DIR/hypr/<signature>/) */
+bool hyprland_ipc_create(struct view_manager *view_manager);
+
 bool ky_toplevel_manager_create(struct server *server);
 
 bool dbus_toplevel_manager_create(struct server *server);

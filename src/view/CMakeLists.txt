@@ -25,6 +25,7 @@ target_sources(flakewm PRIVATE
 target_sources(flakewm PRIVATE
   ky_toplevel.c
   dbus_toplevel.c
+  hyprland_ipc.c
   ky_workspace.c
 )
 
