@@ -168,7 +168,7 @@ std::vector<SInstanceData> instances() {
 static volatile bool sigintReceived = false;
 void                 intHandler(int sig) {
     sigintReceived = true;
-    std::println("[hyprctl] SIGINT received, closing connection");
+    std::println("[flakectl] SIGINT received, closing connection");
 }
 
 int rollingRead(const int socket) {
@@ -178,7 +178,7 @@ int rollingRead(const int socket) {
     constexpr size_t              BUFFER_SIZE = 8192;
     std::array<char, BUFFER_SIZE> buffer      = {0};
     long                          sizeWritten = 0;
-    std::println("[hyprctl] reading from socket following up log:");
+    std::println("[flakectl] reading from socket following up log:");
     while (!sigintReceived) {
         sizeWritten = read(socket, buffer.data(), BUFFER_SIZE);
         if (sizeWritten < 0 && errno != EAGAIN) {

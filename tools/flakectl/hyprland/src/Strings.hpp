@@ -2,7 +2,7 @@
 
 #include <string_view>
 
-const std::string_view USAGE = R"#(usage: hyprctl [flags] <command> [args...|--help]
+const std::string_view USAGE = R"#(usage: flakectl [flags] <command> [args...|--help]
 
 commands:
     activewindow        → Gets the active window name and its properties
@@ -48,7 +48,7 @@ commands:
                           option
     setcursor <theme> <size> → Sets the cursor theme and reloads the cursor
                           manager
-    seterror <color> <message...> → Sets the hyprctl error string. Color has
+    seterror <color> <message...> → Sets the flakectl error string. Color has
                           the same format as in colors in config. Will reset
                           when Hyprland's config is reloaded
     setprop ...         → Sets a window property
@@ -68,23 +68,23 @@ flags:
                           updating variables)
     --batch             → Execute a batch of commands, separated by ';'
     --instance (-i)     → use a specific instance. Can be either signature or
-                          index in hyprctl instances (0, 1, etc)
-    --quiet (-q)        → Disable the output of hyprctl
+                          index in flakectl instances (0, 1, etc)
+    --quiet (-q)        → Disable the output of flakectl
 
 --help:
     Can be used to print command's arguments that did not fit into this page
     (three dots))#";
 
-const std::string_view HYPRPAPER_HELP = R"#(usage: hyprctl [flags] hyprpaper <request>
+const std::string_view HYPRPAPER_HELP = R"#(usage: flakectl [flags] hyprpaper <request>
 
 requests:
     wallpaper       → Issue a wallpaper to call a config wallpaper dynamically.
                       Arguments are [mon],[path],[fit_mode]. Fit mode is optional.
 
 flags:
-    See 'hyprctl --help')#";
+    See 'flakectl --help')#";
 
-const std::string_view HYPRSUNSET_HELP = R"#(usage: hyprctl [flags] hyprsunset <request>
+const std::string_view HYPRSUNSET_HELP = R"#(usage: flakectl [flags] hyprsunset <request>
 
 requests:
     temperature <temp> → Enable blue-light filter
@@ -92,9 +92,9 @@ requests:
     gamma <gamma>      → Enable gamma filter
 
 flags:
-    See 'hyprctl --help')#";
+    See 'flakectl --help')#";
 
-const std::string_view NOTIFY_HELP = R"#(usage: hyprctl [flags] notify <icon> <time_ms> <color> <message...>
+const std::string_view NOTIFY_HELP = R"#(usage: flakectl [flags] notify <icon> <time_ms> <color> <message...>
 
 icon:
     Integer of value:
@@ -117,9 +117,9 @@ message:
     Notification message
 
 flags:
-    See 'hyprctl --help')#";
+    See 'flakectl --help')#";
 
-const std::string_view OUTPUT_HELP = R"#(usage: hyprctl [flags] output <create <backend> | remove <name>>
+const std::string_view OUTPUT_HELP = R"#(usage: flakectl [flags] output <create <backend> | remove <name>>
 
 create <backend>:
     Creates new virtual output. Possible values for backend: wayland, x11,
@@ -127,12 +127,12 @@ create <backend>:
 
 remove <name>:
     Removes virtual output. Pass the output's name, as found in
-    'hyprctl monitors'
+    'flakectl monitors'
 
 flags:
-    See 'hyprctl --help')#";
+    See 'flakectl --help')#";
 
-const std::string_view PLUGIN_HELP = R"#(usage: hyprctl [flags] plugin <request>
+const std::string_view PLUGIN_HELP = R"#(usage: flakectl [flags] plugin <request>
 
 requests:
     load <path>     → Loads a plugin. Path must be absolute
@@ -140,9 +140,9 @@ requests:
     list            → Lists all loaded plugins
 
 flags:
-    See 'hyprctl --help')#";
+    See 'flakectl --help')#";
 
-const std::string_view SETPROP_HELP = R"#(usage: hyprctl [flags] setprop <regex> <property> <value> [lock]
+const std::string_view SETPROP_HELP = R"#(usage: flakectl [flags] setprop <regex> <property> <value> [lock]
 
 regex:
     Regular expression by which a window will be searched
@@ -158,9 +158,9 @@ lock:
     dynamic windowrule cannot override this setting.
 
 flags:
-    See 'hyprctl --help')#";
+    See 'flakectl --help')#";
 
-const std::string_view GETPROP_HELP = R"#(usage: hyprctl [flags] getprop <regex> <property>
+const std::string_view GETPROP_HELP = R"#(usage: flakectl [flags] getprop <regex> <property>
 
 regex:
     Regular expression by which a window will be searched
@@ -169,12 +169,12 @@ property:
     See the wiki for a list of properties
 
 flags:
-    See 'hyprctl --help')#";
+    See 'flakectl --help')#";
 
 const std::string_view SWITCHXKBLAYOUT_HELP = R"#(usage: [flags] switchxkblayout <device> <cmd>
 
 device:
-    You can find the device using 'hyprctl devices' command
+    You can find the device using 'flakectl devices' command
 
 cmd:
     'next' for next, 'prev' for previous, or ID for a specific one. IDs are
@@ -182,4 +182,4 @@ cmd:
     starting from 0
 
 flags:
-    See 'hyprctl --help')#";
+    See 'flakectl --help')#";
