@@ -9,6 +9,7 @@
  */
 #define _GNU_SOURCE
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -168,7 +169,7 @@ struct hypr_ipc {
     bool terminating;
 
     /* what has been announced on the event socket */
-    struct hypr_ws_snapshot ws_snapshot[MAX_WORKSPACES];
+    struct hypr_ws_snapshot ws_snapshot[MAX_WORKSPACES]; // existing workspaces, creation order
     size_t ws_snapshot_count;
     uint64_t *closed_windows;
     size_t closed_window_count, closed_window_cap;
@@ -176,11 +177,9 @@ struct hypr_ipc {
     size_t closed_monitor_count, closed_monitor_cap;
 
     uint32_t announced_ws_id;
-    char *announced_ws_name;
     int announced_mon_id;
     uint64_t announced_window;
     char *announced_class, *announced_title;
-    int announced_fullscreen;
 
     uint32_t previous_ws_id;
 
@@ -205,6 +204,7 @@ struct hypr_window {
     bool announced;
     uint32_t announced_ws_id;
     char *announced_title;
+    int announced_fullscreen;
 
     struct wl_listener unmap;
     struct wl_listener destroy;
@@ -374,6 +374,20 @@ static struct hypr_window *active_window(struct hypr_ipc *ipc)
     }
     /* flakewm keeps the last view activated on an empty workspace */
     return window_workspace(win) == workspace_manager_get_current() ? win : NULL;
+}
+
+static bool ws_exists(struct hypr_ipc *ipc, struct workspace *ws)
+{
+    if (ws == workspace_manager_get_current()) {
+        return true;
+    }
+    struct hypr_window *win;
+    wl_list_for_each(win, &ipc->windows, link) {
+        if (window_eligible(win) && window_workspace(win) == ws) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static struct hypr_monitor *focused_monitor(struct hypr_ipc *ipc)
@@ -629,14 +643,18 @@ static void reconcile_monitors(struct hypr_ipc *ipc)
     }
 }
 
-static void reconcile_workspaces(struct hypr_ipc *ipc)
+/*
+ * Hyprland workspaces are dynamic: one exists while it is shown or holds a
+ * window, and is created/destroyed (with events) as that changes. flakewm's
+ * workspaces are static, so present them the same way.
+ */
+static size_t live_workspaces(struct hypr_ipc *ipc, struct hypr_ws_snapshot live[MAX_WORKSPACES])
 {
-    struct hypr_ws_snapshot live[MAX_WORKSPACES];
     size_t live_count = 0;
     uint32_t count = workspace_manager_get_count();
     for (uint32_t i = 0; i < count && live_count < MAX_WORKSPACES; i++) {
         struct workspace *ws = workspace_by_position(i);
-        if (!ws) {
+        if (!ws || !ws_exists(ipc, ws)) {
             continue;
         }
         char buf[16];
@@ -644,43 +662,63 @@ static void reconcile_workspaces(struct hypr_ipc *ipc)
         live[live_count].name = sanitize_line(ws_name(ws, buf));
         live_count++;
     }
+    return live_count;
+}
 
-    /* destroyed */
-    for (size_t i = 0; i < ipc->ws_snapshot_count; i++) {
-        struct hypr_ws_snapshot *old = &ipc->ws_snapshot[i];
-        bool found = false;
-        for (size_t j = 0; j < live_count; j++) {
-            found |= live[j].id == old->id;
-        }
-        if (!found) {
-            emit_event(ipc, "destroyworkspace", "%s", str_or_empty(old->name));
-            emit_event(ipc, "destroyworkspacev2", "%" PRIu32 ",%s", old->id,
-                       str_or_empty(old->name));
+static struct hypr_ws_snapshot *find_ws(struct hypr_ws_snapshot *list, size_t count, uint32_t id)
+{
+    for (size_t i = 0; i < count; i++) {
+        if (list[i].id == id) {
+            return &list[i];
         }
     }
+    return NULL;
+}
 
-    /* created and renamed */
+/* events carry the addressable name (the id) first, then the display name */
+static void reconcile_workspaces_created(struct hypr_ipc *ipc, struct hypr_ws_snapshot *live,
+                                         size_t live_count)
+{
     for (size_t j = 0; j < live_count; j++) {
-        struct hypr_ws_snapshot *old = NULL;
-        for (size_t i = 0; i < ipc->ws_snapshot_count; i++) {
-            if (ipc->ws_snapshot[i].id == live[j].id) {
-                old = &ipc->ws_snapshot[i];
-            }
-        }
+        struct hypr_ws_snapshot *old = find_ws(ipc->ws_snapshot, ipc->ws_snapshot_count, live[j].id);
         const char *name = str_or_empty(live[j].name);
         if (!old) {
-            emit_event(ipc, "createworkspace", "%s", name);
+            emit_event(ipc, "createworkspace", "%" PRIu32, live[j].id);
             emit_event(ipc, "createworkspacev2", "%" PRIu32 ",%s", live[j].id, name);
         } else if (str_changed(old->name, name)) {
             emit_event(ipc, "renameworkspace", "%" PRIu32 ",%s", live[j].id, name);
         }
     }
+}
+
+/* after the focus events, like Hyprland's workspace cleanup; takes live[] */
+static void reconcile_workspaces_destroyed(struct hypr_ipc *ipc, struct hypr_ws_snapshot *live,
+                                           size_t live_count)
+{
+    struct hypr_ws_snapshot next[MAX_WORKSPACES];
+    size_t next_count = 0;
+    bool taken[MAX_WORKSPACES] = { false };
 
     for (size_t i = 0; i < ipc->ws_snapshot_count; i++) {
-        free(ipc->ws_snapshot[i].name);
+        struct hypr_ws_snapshot *old = &ipc->ws_snapshot[i];
+        struct hypr_ws_snapshot *cur = find_ws(live, live_count, old->id);
+        if (cur) {
+            taken[cur - live] = true;
+            next[next_count++] = *cur;
+        } else {
+            emit_event(ipc, "destroyworkspace", "%" PRIu32, old->id);
+            emit_event(ipc, "destroyworkspacev2", "%" PRIu32 ",%s", old->id,
+                       str_or_empty(old->name));
+        }
+        free(old->name);
     }
-    memcpy(ipc->ws_snapshot, live, sizeof(live[0]) * live_count);
-    ipc->ws_snapshot_count = live_count;
+    for (size_t j = 0; j < live_count; j++) {
+        if (!taken[j]) {
+            next[next_count++] = live[j];
+        }
+    }
+    memcpy(ipc->ws_snapshot, next, sizeof(next[0]) * next_count);
+    ipc->ws_snapshot_count = next_count;
 }
 
 static void reconcile_windows(struct hypr_ipc *ipc)
@@ -706,19 +744,29 @@ static void reconcile_windows(struct hypr_ipc *ipc)
         uint32_t id = ws ? ws_id(ws) : 0;
         char *ws_label = sanitize_line(ws ? ws_name(ws, buf) : "");
         char *title = sanitize_line(win->view->base.title);
+        int fullscreen = window_fullscreen_mode(win->view);
 
         if (!win->announced) {
+            /* Hyprland reports the title set before the first map */
+            if (title && *title) {
+                emit_event(ipc, "windowtitle", "%" PRIx64, win->address);
+                emit_event(ipc, "windowtitlev2", "%" PRIx64 ",%s", win->address, title);
+            }
             char *cls = sanitize_line(win->view->base.app_id);
-            emit_event(ipc, "openwindow", "%" PRIx64 ",%s,%s,%s", win->address,
-                       str_or_empty(ws_label), str_or_empty(cls), str_or_empty(title));
+            emit_event(ipc, "openwindow", "%" PRIx64 ",%" PRIu32 ",%s,%s", win->address, id,
+                       str_or_empty(cls), str_or_empty(title));
             free(cls);
+            /* a pending fullscreen/maximize request is applied after openwindow */
+            if (fullscreen) {
+                emit_event(ipc, "fullscreen", "1");
+            }
             win->announced = true;
             win->announced_ws_id = id;
+            win->announced_fullscreen = fullscreen;
             replace_str(&win->announced_title, title);
         } else {
             if (win->announced_ws_id != id && !win->view->base.sticky) {
-                emit_event(ipc, "movewindow", "%" PRIx64 ",%s", win->address,
-                           str_or_empty(ws_label));
+                emit_event(ipc, "movewindow", "%" PRIx64 ",%" PRIu32, win->address, id);
                 emit_event(ipc, "movewindowv2", "%" PRIx64 ",%" PRIu32 ",%s", win->address, id,
                            str_or_empty(ws_label));
             }
@@ -729,37 +777,31 @@ static void reconcile_windows(struct hypr_ipc *ipc)
                            str_or_empty(title));
                 replace_str(&win->announced_title, title);
             }
+            /* any change of the fullscreen mode, maximized (1) included */
+            if (fullscreen != win->announced_fullscreen) {
+                emit_event(ipc, "fullscreen", "%d", fullscreen != 0);
+                win->announced_fullscreen = fullscreen;
+            }
         }
         free(ws_label);
         free(title);
     }
 }
 
+/* same order as Hyprland: focusedmon, activewindow, then workspace */
 static void reconcile_focus(struct hypr_ipc *ipc)
 {
     struct workspace *ws = workspace_manager_get_current();
     char buf[16];
     uint32_t id = ws ? ws_id(ws) : 0;
-    char *name = sanitize_line(ws ? ws_name(ws, buf) : "");
-
-    if (ws && (id != ipc->announced_ws_id || str_changed(ipc->announced_ws_name, name))) {
-        if (id != ipc->announced_ws_id && ipc->announced_ws_id) {
-            ipc->previous_ws_id = ipc->announced_ws_id;
-        }
-        emit_event(ipc, "workspace", "%s", str_or_empty(name));
-        emit_event(ipc, "workspacev2", "%" PRIu32 ",%s", id, str_or_empty(name));
-    }
 
     struct hypr_monitor *mon = focused_monitor(ipc);
     int mon_id = mon ? mon->id : -1;
     if (mon && mon_id != ipc->announced_mon_id) {
-        emit_event(ipc, "focusedmon", "%s,%s", mon->output->name, str_or_empty(name));
+        emit_event(ipc, "focusedmon", "%s,%" PRIu32, mon->output->name, id);
         emit_event(ipc, "focusedmonv2", "%s,%" PRIu32, mon->output->name, id);
     }
     ipc->announced_mon_id = mon_id;
-    ipc->announced_ws_id = id;
-    replace_str(&ipc->announced_ws_name, name);
-    free(name);
 
     struct hypr_window *win = active_window(ipc);
     uint64_t address = win ? win->address : 0;
@@ -781,21 +823,16 @@ static void reconcile_focus(struct hypr_ipc *ipc)
     free(cls);
     free(title);
 
-    /* fullscreen state of the current workspace */
-    int fullscreen = 0;
-    wl_list_for_each(win, &ipc->windows, link) {
-        if (window_eligible(win) && window_workspace(win) == ws && !win->view->base.minimized &&
-            win->view->base.fullscreen) {
-            fullscreen = 1;
-            break;
+    /* a rename alone is reported by renameworkspace */
+    if (ws && id != ipc->announced_ws_id) {
+        if (ipc->announced_ws_id) {
+            ipc->previous_ws_id = ipc->announced_ws_id;
         }
-    }
-    if (fullscreen != ipc->announced_fullscreen) {
-        /* the first state is the baseline, not a change */
-        if (ipc->announced_fullscreen >= 0 || fullscreen) {
-            emit_event(ipc, "fullscreen", "%d", fullscreen);
-        }
-        ipc->announced_fullscreen = fullscreen;
+        char *name = sanitize_line(ws_name(ws, buf));
+        emit_event(ipc, "workspace", "%" PRIu32, id);
+        emit_event(ipc, "workspacev2", "%" PRIu32 ",%s", id, str_or_empty(name));
+        free(name);
+        ipc->announced_ws_id = id;
     }
 }
 
@@ -809,9 +846,12 @@ static void reconcile(struct hypr_ipc *ipc)
         return;
     }
     reconcile_monitors(ipc);
-    reconcile_workspaces(ipc);
+    struct hypr_ws_snapshot live[MAX_WORKSPACES];
+    size_t live_count = live_workspaces(ipc, live);
+    reconcile_workspaces_created(ipc, live, live_count);
     reconcile_windows(ipc);
     reconcile_focus(ipc);
+    reconcile_workspaces_destroyed(ipc, live, live_count);
 }
 
 static void handle_reconcile_idle(void *data)
@@ -1239,7 +1279,7 @@ static json_object *json_workspace(struct hypr_ipc *ipc, struct workspace *ws)
     json_object_object_add(
         obj, "lastwindowtitle",
         json_object_new_string(last ? str_or_empty(last->view->base.title) : ""));
-    json_object_object_add(obj, "ispersistent", json_object_new_boolean(true));
+    json_object_object_add(obj, "ispersistent", json_object_new_boolean(false));
     return obj;
 }
 
@@ -1258,7 +1298,7 @@ static void text_workspace(struct hypr_ipc *ipc, struct workspace *ws, struct sb
                 mon ? mon->id : -1, windows, fullscreen);
     sbuf_printf(out, "\tlastwindow: 0x%" PRIx64 "\n\tlastwindowtitle: %s\n",
                 last ? last->address : 0, last ? str_or_empty(last->view->base.title) : "");
-    sbuf_printf(out, "\tispersistent: 1\n\n");
+    sbuf_printf(out, "\tispersistent: 0\n\n");
 }
 
 static void monitor_reserved(struct hypr_monitor *mon, int reserved[4])
@@ -1438,9 +1478,9 @@ static void cmd_workspaces(struct hypr_ipc *ipc, struct hypr_flags *f, const cha
                            struct sbuf *out)
 {
     json_object *arr = f->json ? json_object_new_array() : NULL;
-    uint32_t count = workspace_manager_get_count();
-    for (uint32_t i = 0; i < count; i++) {
-        struct workspace *ws = workspace_by_position(i);
+    /* existing workspaces in creation order, as announced */
+    for (size_t i = 0; i < ipc->ws_snapshot_count; i++) {
+        struct workspace *ws = ws_by_id(ipc->ws_snapshot[i].id);
         if (!ws) {
             continue;
         }
@@ -1474,6 +1514,7 @@ static void cmd_clients(struct hypr_ipc *ipc, struct hypr_flags *f, const char *
                         struct sbuf *out)
 {
     json_object *arr = f->json ? json_object_new_array() : NULL;
+    size_t start = out->len; // a batch shares the buffer
     struct hypr_window *win;
     /* oldest first, like Hyprland */
     wl_list_for_each_reverse(win, &ipc->windows, link) {
@@ -1488,6 +1529,8 @@ static void cmd_clients(struct hypr_ipc *ipc, struct hypr_flags *f, const char *
     }
     if (arr) {
         json_append(out, arr);
+    } else if (out->len == start) {
+        sbuf_puts(out, "no open windows");
     }
 }
 
@@ -1496,7 +1539,7 @@ static void cmd_activewindow(struct hypr_ipc *ipc, struct hypr_flags *f, const c
 {
     struct hypr_window *win = active_window(ipc);
     if (!win) {
-        sbuf_puts(out, f->json ? "{}" : "Invalid\n");
+        sbuf_puts(out, f->json ? "{}" : "Invalid");
         return;
     }
     if (f->json) {
@@ -1630,7 +1673,7 @@ static void cmd_splash(struct hypr_ipc *ipc, struct hypr_flags *f, const char *a
 static void cmd_submap(struct hypr_ipc *ipc, struct hypr_flags *f, const char *args,
                        struct sbuf *out)
 {
-    sbuf_puts(out, "default");
+    sbuf_puts(out, f->json ? "\"default\"\n" : "default\n");
 }
 
 static void cmd_ok(struct hypr_ipc *ipc, struct hypr_flags *f, const char *args,
@@ -1718,23 +1761,45 @@ static struct hypr_window *window_by_selector(struct hypr_ipc *ipc, const char *
     return NULL;
 }
 
-static struct workspace *workspace_relative(struct workspace *current, long delta, bool wrap)
+/* flakewm cannot create workspaces, ids past the last one clamp to it */
+static struct workspace *workspace_clamped(long id)
 {
     long count = workspace_manager_get_count();
-    if (!current || count <= 0) {
+    if (count <= 0) {
         return NULL;
     }
-    long pos = (long)current->position + delta;
-    if (wrap) {
-        pos = ((pos % count) + count) % count;
-    } else if (pos < 0) {
-        pos = 0;
-    } else if (pos >= count) {
-        pos = count - 1;
-    }
-    return workspace_by_position(pos);
+    return workspace_by_position(id < 1 ? 0 : id > count ? count - 1 : id - 1);
 }
 
+static struct workspace *workspace_by_name(const char *name)
+{
+    uint32_t count = workspace_manager_get_count();
+    for (uint32_t i = 0; i < count; i++) {
+        struct workspace *ws = workspace_by_position(i);
+        char buf[16];
+        if (ws && !strcmp(ws_name(ws, buf), name)) {
+            return ws;
+        }
+    }
+    return NULL;
+}
+
+/* "+3", "-1", "~2": sign and number, nothing else */
+static bool parse_offset(const char *s, long *value)
+{
+    if ((s[0] != '+' && s[0] != '-' && s[0] != '~') || !isdigit((unsigned char)s[1])) {
+        return false;
+    }
+    char *end = NULL;
+    long v = strtol(s + 1, &end, 10);
+    if (!end || *end) {
+        return false;
+    }
+    *value = s[0] == '-' ? -v : v;
+    return true;
+}
+
+/* Hyprland's workspace selectors (src/state/workspace/Resolver.cpp) */
 static struct workspace *workspace_by_selector(struct hypr_ipc *ipc, const char *sel)
 {
     while (sel && *sel == ' ') {
@@ -1745,58 +1810,75 @@ static struct workspace *workspace_by_selector(struct hypr_ipc *ipc, const char 
     }
 
     struct workspace *current = workspace_manager_get_current();
-    char *end = NULL;
+    long current_id = current ? (long)ws_id(current) : 1;
+    long offset;
 
-    if (!strcmp(sel, "previous") || !strcmp(sel, "previous_per_monitor")) {
-        return ws_by_id(ipc->previous_ws_id);
-    }
     if (!strncmp(sel, "name:", 5)) {
-        uint32_t count = workspace_manager_get_count();
-        for (uint32_t i = 0; i < count; i++) {
-            struct workspace *ws = workspace_by_position(i);
-            char buf[16];
-            if (ws && !strcmp(ws_name(ws, buf), sel + 5)) {
-                return ws;
-            }
-        }
-        return NULL;
+        return sel[5] ? workspace_by_name(sel + 5) : NULL;
     }
     if (!strncmp(sel, "empty", 5)) {
-        uint32_t count = workspace_manager_get_count();
-        for (uint32_t i = 0; i < count; i++) {
-            struct workspace *ws = workspace_by_position(i);
+        /* "n": the next empty one after the current, "m": same monitor (all are) */
+        long count = workspace_manager_get_count();
+        for (long id = strchr(sel + 5, 'n') ? current_id + 1 : 1; id <= count; id++) {
+            struct workspace *ws = ws_by_id(id);
             int windows;
             bool fs;
             struct hypr_window *last;
-            if (!ws) {
-                continue;
-            }
-            workspace_stats(ipc, ws, &windows, &fs, &last);
-            if (windows == 0) {
-                return ws;
-            }
-        }
-        return NULL;
-    }
-    if (sel[0] == 'e' || sel[0] == 'm' || sel[0] == 'r') {
-        if (sel[1] == '+' || sel[1] == '-') {
-            long delta = strtol(sel + 1, &end, 10);
-            if (end && *end == '\0') {
-                return workspace_relative(current, delta, sel[0] != 'r');
+            if (ws) {
+                workspace_stats(ipc, ws, &windows, &fs, &last);
+                if (windows == 0) {
+                    return ws;
+                }
             }
         }
         return NULL;
     }
-    if (sel[0] == '+' || sel[0] == '-') {
-        long delta = strtol(sel, &end, 10);
-        return end && *end == '\0' ? workspace_relative(current, delta, false) : NULL;
+    if (!strcmp(sel, "prev") || !strcmp(sel, "previous") ||
+        !strcmp(sel, "previous_per_monitor")) {
+        return ws_by_id(ipc->previous_ws_id);
+    }
+    if (!strcmp(sel, "next")) {
+        return workspace_clamped(current_id + 1);
+    }
+    if (sel[0] == 'r' && parse_offset(sel + 1, &offset)) {
+        /* every workspace counts, empty ones included */
+        return workspace_clamped(sel[1] == '~' ? offset : current_id + offset);
+    }
+    if ((sel[0] == 'm' || sel[0] == 'e') && parse_offset(sel + 1, &offset)) {
+        /* only existing workspaces, sorted by id; relative wraps, absolute clamps */
+        struct workspace *list[MAX_WORKSPACES];
+        long n = 0, index = 0;
+        uint32_t count = workspace_manager_get_count();
+        for (uint32_t i = 0; i < count && n < MAX_WORKSPACES; i++) {
+            struct workspace *ws = workspace_by_position(i);
+            if (ws && ws_exists(ipc, ws)) {
+                if (ws == current) {
+                    index = n;
+                }
+                list[n++] = ws;
+            }
+        }
+        if (n == 0) {
+            return NULL;
+        }
+        if (sel[1] == '~') {
+            index = offset - 1 < 0 ? 0 : offset - 1 >= n ? n - 1 : offset - 1;
+        } else {
+            index = ((index + offset) % n + n) % n;
+        }
+        return list[index];
+    }
+    if (parse_offset(sel, &offset) && sel[0] != '~') {
+        return workspace_clamped(current_id + offset);
     }
 
+    char *end = NULL;
     long id = strtol(sel, &end, 10);
     if (end && end != sel && *end == '\0') {
         return id > 0 ? ws_by_id((uint32_t)id) : NULL;
     }
-    return NULL;
+    /* a bare name addresses a named workspace */
+    return workspace_by_name(sel);
 }
 
 static void focus_view(struct view *view)
@@ -2045,6 +2127,8 @@ static void handle_one_request(struct hypr_ipc *ipc, char *request, struct hypr_
                                struct sbuf *out)
 {
     request = parse_flags(request, &flags);
+    /* replies must agree with the event stream, also within a batch */
+    reconcile(ipc);
 
     for (size_t i = 0; i < sizeof(hypr_commands) / sizeof(hypr_commands[0]); i++) {
         const char *name = hypr_commands[i].name;
@@ -2429,7 +2513,6 @@ static void handle_server_destroy(struct wl_listener *listener, void *data)
     }
     free(ipc->closed_monitors);
     free(ipc->closed_windows);
-    free(ipc->announced_ws_name);
     free(ipc->announced_class);
     free(ipc->announced_title);
 
@@ -2471,7 +2554,6 @@ bool hyprland_ipc_create(struct view_manager *view_manager)
     ipc->request_fd = ipc->event_fd = -1;
     ipc->next_address = 0x1000;
     ipc->announced_mon_id = -1;
-    ipc->announced_fullscreen = -1;
     wl_list_init(&ipc->requests);
     wl_list_init(&ipc->subscribers);
     wl_list_init(&ipc->windows);
