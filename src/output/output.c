@@ -867,6 +867,11 @@ static void handle_new_output(struct wl_listener *listener, void *data)
     struct server *server = output_manager->server;
     struct wlr_output *wlr_output = data;
 
+    /* VR headsets and the like are leased to clients, not part of the desktop */
+    if (wlr_output->non_desktop && output_drm_lease_offer(wlr_output)) {
+        return;
+    }
+
     if (!wlr_output_init_render(wlr_output, server->allocator, server->renderer)) {
         kywc_log(KYWC_ERROR, "unable to init output renderer");
         return;
@@ -1200,6 +1205,7 @@ struct output_manager *output_manager_create(struct server *server)
     wlr_output_management_create(server);
     ukui_output_management_create(server);
     output_gamma_control_create(server);
+    output_drm_lease_create(server);
     output_gamma_dbus_init(output_manager);
     output_night_mode_create(server);
 

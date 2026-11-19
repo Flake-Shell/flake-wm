@@ -570,6 +570,9 @@ struct input_manager *input_manager_create(struct server *server)
     wl_signal_add(&input_manager->pointer_constraints->events.new_constraint,
                   &input_manager->new_pointer_constraint);
 
+    cursor_shape_manager_create(input_manager);
+    pointer_warp_manager_create(input_manager);
+
     input_manager_config_init(input_manager);
     selection_manager_create(input_manager);
     input_monitor_create(input_manager);

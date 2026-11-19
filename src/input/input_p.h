@@ -90,6 +90,23 @@ void cursor_set_xcursor_manager(struct cursor *cursor, const char *theme, uint32
 void cursor_set_surface(struct cursor *cursor, struct wlr_surface *surface, int32_t hotspot_x,
                         int32_t hotspot_y, struct wl_client *client);
 
+struct wlr_seat_client;
+
+/* cursor-shape-v1: set a named cursor on behalf of a client */
+void cursor_set_client_xcursor(struct cursor *cursor, const char *name, struct wl_client *client);
+
+/* true if the client may set the pointer cursor now (has focus, no grab ...) */
+bool cursor_pointer_client_may_set_cursor(struct cursor *cursor,
+                                          struct wlr_seat_client *seat_client);
+
+/* move the cursor to a surface-local position, then update pointer focus */
+bool cursor_warp_to_surface(struct cursor *cursor, struct wlr_surface *surface, double sx,
+                            double sy);
+
+bool cursor_shape_manager_create(struct input_manager *input_manager);
+
+bool pointer_warp_manager_create(struct input_manager *input_manager);
+
 bool seat_read_config(struct seat *seat);
 
 void seat_write_config(struct seat *seat);

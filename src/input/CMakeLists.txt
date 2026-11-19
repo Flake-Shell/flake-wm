@@ -3,6 +3,7 @@ target_sources(flakewm PRIVATE
   binding.c
   config.c
   cursor.c
+  cursor_shape.c
   event.c
   gesture.c
   idle.c
@@ -13,6 +14,7 @@ target_sources(flakewm PRIVATE
   keyboard_group.c
   libinput.c
   monitor.c
+  pointer_warp.c
   tablet.c
   text_input_v1.c
   text_input_v2.c

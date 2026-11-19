@@ -2310,11 +2310,13 @@ struct view_manager *view_manager_create(struct server *server)
     kde_plasma_window_management_create(server);
     kde_appmenu_manager_create(server);
     kde_blur_manager_create(server);
+    ext_background_effect_manager_create(server);
     treeland_dde_shell_manager_create(server);
     treeland_personalization_manager_create(server);
     kde_slide_manager_create(server);
     xdg_dialog_create(server);
     xdg_activation_create(server);
+    xdg_extras_create(server);
     ukui_shell_create(server);
     ukui_window_management_create(server);
     ukui_blur_manager_create(server);

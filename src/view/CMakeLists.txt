@@ -2,6 +2,8 @@ target_sources(flakewm PRIVATE
   action.c
   config.c
   decoration.c
+  ext_background_effect.c
+  ext_workspace.c
   global_authentication.c
   interactive.c
   maximize_switcher.c
@@ -20,6 +22,7 @@ target_sources(flakewm PRIVATE
   xdg_popup.c
   xdg_shell.c
   xdg_activation.c
+  xdg_extras.c
 )
 
 target_sources(flakewm PRIVATE

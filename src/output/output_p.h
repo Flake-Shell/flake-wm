@@ -73,6 +73,12 @@ struct wlr_gamma_control_v1 *output_get_gamma_control(struct wlr_output *wlr_out
 
 bool output_gamma_control_create(struct server *server);
 
+/* wp_drm_lease_device_v1, see drm_lease.c */
+bool output_drm_lease_create(struct server *server);
+
+/* offer a non-desktop output for lease, false if it is to be used as desktop output */
+bool output_drm_lease_offer(struct wlr_output *wlr_output);
+
 void output_set_pending_primary(struct output *output);
 
 void output_add_common_modes(struct output *output);

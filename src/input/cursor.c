@@ -717,17 +717,56 @@ void cursor_set_surface(struct cursor *cursor, struct wlr_surface *surface, int3
     wlr_cursor_set_surface(cursor->wlr_cursor, surface, hotspot_x, hotspot_y);
 }
 
-static void cursor_handle_request_set_cursor(struct wl_listener *listener, void *data)
+void cursor_set_client_xcursor(struct cursor *cursor, const char *name, struct wl_client *client)
 {
-    struct cursor *cursor = wl_container_of(listener, cursor, request_set_cursor);
-    struct wlr_seat_pointer_request_set_cursor_event *event = data;
+    /* a named shape replaces any client cursor surface tracked for xwayland */
+    if (cursor->surface) {
+        cursor_handle_surface_destroy(&cursor->surface_destroy, NULL);
+    }
+
+    /* use this to filter cursor image */
+    cursor->client_requested = true;
+    wlr_cursor_set_xcursor(cursor->wlr_cursor, cursor->xcursor_manager, name);
+}
+
+bool cursor_pointer_client_may_set_cursor(struct cursor *cursor, struct wlr_seat_client *seat_client)
+{
     struct wlr_seat_client *focused_client = cursor->seat->wlr_seat->pointer_state.focused_client;
     struct seat_pointer_grab *grab = cursor->seat->pointer_grab;
 
     if (cursor->image_locks > 0 || cursor->hidden) {
-        return;
+        return false;
     }
-    if ((!session_lock_is_active() && grab) || focused_client != event->seat_client) {
+    if ((!session_lock_is_active() && grab) || focused_client != seat_client) {
+        return false;
+    }
+    return true;
+}
+
+bool cursor_warp_to_surface(struct cursor *cursor, struct wlr_surface *surface, double sx,
+                            double sy)
+{
+    struct ky_scene_buffer *buffer = ky_scene_buffer_try_from_surface(surface);
+    if (!buffer) {
+        return false;
+    }
+
+    int lx, ly;
+    if (!ky_scene_node_coords(&buffer->node, &lx, &ly)) {
+        return false;
+    }
+
+    cursor_move(cursor, NULL, lx + sx, ly + sy, false, false);
+    cursor_feed_fake_motion(cursor, true);
+    return true;
+}
+
+static void cursor_handle_request_set_cursor(struct wl_listener *listener, void *data)
+{
+    struct cursor *cursor = wl_container_of(listener, cursor, request_set_cursor);
+    struct wlr_seat_pointer_request_set_cursor_event *event = data;
+
+    if (!cursor_pointer_client_may_set_cursor(cursor, event->seat_client)) {
         return;
     }
 

@@ -36,6 +36,9 @@ struct ky_scene_surface {
     struct wl_listener surface_map;
 
     struct ky_scene_node_interface buffer_default_impl;
+
+    /* buffer opacity is driven by wp_alpha_modifier_v1 */
+    bool alpha_modified;
 };
 
 struct ky_scene_tree *ky_scene_subsurface_tree_create(struct ky_scene_tree *parent,
@@ -49,5 +52,11 @@ struct ky_scene_surface *ky_scene_surface_try_from_buffer(struct ky_scene_buffer
 struct wlr_surface *wlr_surface_try_from_node(struct ky_scene_node *node);
 
 struct ky_scene_buffer *ky_scene_buffer_try_from_surface(struct wlr_surface *wlr_surface);
+
+/* wp_fifo_v1, see scene/fifo.c */
+bool fifo_manager_create(struct wl_display *display);
+
+/* wp_commit_timing_v1, see scene/commit_timing.c */
+bool commit_timing_manager_create(struct wl_display *display);
 
 #endif /* _SCENE_SURFACE_H_ */

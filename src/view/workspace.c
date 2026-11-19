@@ -329,6 +329,7 @@ bool workspace_manager_create(struct view_manager *view_manager)
     ky_workspace_manager_create(view_manager->server);
     /* kde-plasma-virtual-desktop support */
     kde_virtual_desktop_management_create(view_manager->server);
+    ext_workspace_manager_create(view_manager->server);
 
     workspace_register_shortcut();
 

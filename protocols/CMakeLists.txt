@@ -26,6 +26,10 @@ set(protocols
   ext-transient-seat-v1 ${WL_PROTOCOL_DIR}/staging/ext-transient-seat/ext-transient-seat-v1.xml
   xdg-toplevel-drag-manager-v1 ${WL_PROTOCOL_DIR}/staging/xdg-toplevel-drag/xdg-toplevel-drag-v1.xml
   wptearing-contorl-v1 ${WL_PROTOCOL_DIR}/staging/tearing-control/tearing-control-v1.xml
+  wp-fifo-v1 ${WL_PROTOCOL_DIR}/staging/fifo/fifo-v1.xml
+  wp-commit-timing-v1 ${WL_PROTOCOL_DIR}/staging/commit-timing/commit-timing-v1.xml
+  wp-pointer-warp-v1 ${WL_PROTOCOL_DIR}/staging/pointer-warp/pointer-warp-v1.xml
+  ext-background-effect-v1 ${WL_PROTOCOL_DIR}/staging/ext-background-effect/ext-background-effect-v1.xml
 )
 
 list(APPEND protocols
