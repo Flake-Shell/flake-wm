@@ -5,7 +5,7 @@
 **尚未提供** 或 **版本较低** 的协议，以及已补齐部分的实现情况。
 
 - flake-wm 一侧以 `src/` 中实际的 `wl_global_create` / `wlr_*_create` 调用为准，
-  而不是 `docs/PROTOCOLS.md`（该文件已过时）。
+  完整的支持列表见 `docs/PROTOCOLS.md`
 - 「wlroots 助手」指 `libs/wlroots`（0.20.2）中是否已有现成实现
   （`libs/wlroots/types/`），有的话一般只需在 server 里创建并接上信号。
 
