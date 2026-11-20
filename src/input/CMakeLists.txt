@@ -26,6 +26,7 @@ target_sources(flakewm PRIVATE
   touch.c
   transient_seat.c
   vicinae_hotkey.c
+  xx_hotkey.c
   seat.c
   selection.c
   selection_data.c

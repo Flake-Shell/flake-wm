@@ -168,6 +168,7 @@ wayland协议支持情况
 | qt_surface_extension       |    no    | 1    |
 | gtk_shell1                 |    no    | 5    |
 | vicinae_hotkey_manager_v1  |    1     | 与合成器快捷键冲突的组合会被拒绝 |
+| xx_hotkey_manager_v1       |    1     | 与 vicinae 共用同一套规则；另支持按钮触发（不带 Ctrl/Alt/Super 时只允许侧键等辅助键）；set_seat、set_description 只接受不使用 |
 
 ## hyprland
 > https://github.com/hyprwm/hyprland-protocols

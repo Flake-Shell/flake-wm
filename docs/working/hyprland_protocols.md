@@ -40,9 +40,7 @@ global 存在、尚未用客户端实际操作过。
 
 ## 3. 缺失：其他第三方协议
 
-| 全局接口 | Hyprland 版本 | 用途 |
-| :-- | :--: | :-- |
-| `xx_hotkey_manager_v1` | 1 | 实验性全局热键协议 |
+已全部实现，见 `docs/PROTOCOLS.md` 的 external 一节。
 
 ## 4. 已有但版本低于 Hyprland
 

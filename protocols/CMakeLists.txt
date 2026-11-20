@@ -38,6 +38,7 @@ set(protocols
   hyprland-workspace-image-capture-source-v1 hyprland-workspace-image-capture-source-v1.xml
   hyprland-input-capture-v1 hyprland-input-capture-v1.xml
   vicinae-hotkey-v1 vicinae-hotkey-v1.xml
+  xx-hotkey-v1 xx-hotkey-v1.xml
   # referenced by the hyprland toplevel protocols, wlroots keeps its copy private
   zwlr-foreign-toplevel-management-v1 ${PROJECT_SOURCE_DIR}/libs/wlroots/protocol/wlr-foreign-toplevel-management-unstable-v1.xml
   hyprland-toplevel-export-v1 hyprland-toplevel-export-v1.xml

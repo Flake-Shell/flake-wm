@@ -145,6 +145,11 @@ enum hotkey_deny {
     HOTKEY_DENY_INVALID,
 };
 
+enum hotkey_trigger {
+    HOTKEY_TRIGGER_KEY,
+    HOTKEY_TRIGGER_BUTTON,
+};
+
 struct hotkey;
 
 struct hotkey_impl {
@@ -162,11 +167,18 @@ void hotkey_destroy(struct hotkey *hotkey);
 enum hotkey_deny hotkey_bind_key(struct hotkey *hotkey, xkb_keysym_t keysym, uint32_t modifiers,
                                  const char **message);
 
+enum hotkey_deny hotkey_bind_button(struct hotkey *hotkey, uint32_t button, uint32_t modifiers,
+                                    const char **message);
+
 /* true if the key event was a hotkey and must not reach the clients */
 bool hotkeys_handle_key(struct keyboard *keyboard, uint32_t key, bool pressed, uint32_t time,
                         uint32_t modifiers, bool allow_press);
 
-/* a button or scroll ends a pending modifier tap */
+/* true if the button event was a hotkey, any button also ends a pending modifier tap */
+bool hotkeys_handle_button(struct seat *seat, uint32_t button, bool pressed, uint32_t time,
+                           bool allow_press);
+
+/* a scroll ends a pending modifier tap */
 void hotkeys_cancel_taps(void);
 
 void hotkeys_keyboard_destroy(struct keyboard *keyboard);
@@ -176,6 +188,9 @@ void hotkeys_revoke_conflicting(void);
 
 /* vicinae_hotkey_manager_v1, see vicinae_hotkey.c */
 bool vicinae_hotkey_manager_create(struct input_manager *input_manager);
+
+/* xx_hotkey_manager_v1, see xx_hotkey.c */
+bool xx_hotkey_manager_create(struct input_manager *input_manager);
 
 /* true while the shortcut editor waits for the next key, see action.c */
 bool input_action_is_grabbing(void);

@@ -210,7 +210,10 @@ void cursor_feed_button(struct cursor *cursor, uint32_t button, bool pressed, ui
     if (input_capture_handle_button(button, pressed)) {
         return;
     }
-    hotkeys_cancel_taps();
+    if (hotkeys_handle_button(seat, button, pressed, time,
+                              !session_lock_is_active() && !seat->pointer_grab)) {
+        return;
+    }
 
     if (!session_lock_is_active() && seat->pointer_grab && seat->pointer_grab->interface->button &&
         seat->pointer_grab->interface->button(seat->pointer_grab, time, button, pressed)) {
