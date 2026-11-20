@@ -61,6 +61,8 @@ static struct bindings {
     size_t keysym_bindings_block;
     size_t type_nlocks[KEY_BINDING_TYPE_NUM];
     uint32_t keysyms_binding_masks; /* binding mask */
+
+    bool defaults_disabled;
 } *bindings = NULL;
 
 const struct key_binding_type2string {
@@ -270,6 +272,10 @@ bool bindings_create(struct input_manager *input_manager)
         wl_list_init(&keysyms_binding->bindings);
     }
     wl_list_init(&bindings->gesture_bindings);
+    bindings->defaults_disabled = input_manager->server->options.no_default_keybind;
+    if (bindings->defaults_disabled) {
+        kywc_log(KYWC_INFO, "default key bindings are disabled");
+    }
 
     bindings->server_destroy.notify = handle_server_destroy;
     server_add_destroy_listener(input_manager->server, &bindings->server_destroy);
@@ -681,6 +687,11 @@ void kywc_key_binding_for_each_typed(binding_typed_iterator_func_t iterator, voi
             }
         }
     }
+}
+
+bool kywc_key_binding_defaults_disabled(void)
+{
+    return bindings && bindings->defaults_disabled;
 }
 
 void kywc_key_binding_block_all(bool block)

@@ -361,7 +361,10 @@ Usage: kylin-wlcom [options] [command]
   -s, --session <process>  Run session on startup\n
   -v, --version            Show the version number and quit.\n
   -V, --verbose            Enables more verbose logging.\n
+      --no-default-keybind Register no key bindings on startup.\n
 ```
+
+`--no-default-keybind` 启动时不注册任何快捷键：既不注册内置快捷键（窗口操作、切换工作区、Alt+Tab、多任务视图等），也不注册 InputAction 配置里的快捷键。已保存的动作仍会列出，可通过 `ControlAction enable` 绑定
 
 
 

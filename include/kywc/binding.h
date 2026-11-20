@@ -137,6 +137,8 @@ void kywc_key_binding_for_each_typed(binding_typed_iterator_func_t iterator, voi
 
 void kywc_key_binding_block_all(bool block);
 
+bool kywc_key_binding_defaults_disabled(void);
+
 void kywc_key_binding_block_type(enum key_binding_type type, bool block);
 
 enum key_binding_type kywc_key_binding_type_by_name(const char *name, bool *found);

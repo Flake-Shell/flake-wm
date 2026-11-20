@@ -367,7 +367,10 @@ Usage: kylin-wlcom [options] [command]
   -s, --session <process>  Run session on startup\n
   -v, --version            Show the version number and quit.\n
   -V, --verbose            Enables more verbose logging.\n
+      --no-default-keybind Register no key bindings on startup.\n
 ```
+
+`--no-default-keybind` registers no key bindings on startup: neither the built-in shortcuts (window actions, workspace switching, Alt+Tab, multitasking view ...) nor the ones in the InputAction config. Saved actions stay listed and can be bound with `ControlAction enable`.
 
 
 

@@ -1050,7 +1050,8 @@ static int control_input_action(sd_bus_message *m, void *userdata, sd_bus_error 
         input_action_manager_write_config(manager, input_action);
         break;
     case CONTROL_TYPE_ENABLE:
-        if (input_action->action->enable) {
+        /* enabled but unbound when started with --no-default-keybind */
+        if (input_action->action->enable && input_action->data) {
             break;
         }
         if (input_action->type == INPUT_TYPE_KEYBOARD) {
@@ -1179,7 +1180,9 @@ static void input_action_create_with_keyboard(struct input_action_manager *manag
 
         wl_list_insert(&manager->actions, &input_action->link);
 
-        if (!action_data->enable) {
+        /* --no-default-keybind: keep the action listed but unbound, an
+         * "enable" through ControlAction binds it */
+        if (!action_data->enable || kywc_key_binding_defaults_disabled()) {
             continue;
         }
 

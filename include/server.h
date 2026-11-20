@@ -21,6 +21,8 @@ struct server {
         bool log_in_realtime;
         /* Mutual binding, living and dying together */
         bool binding_session;
+        /* --no-default-keybind: register no key bindings at startup */
+        bool no_default_keybind;
     } options;
 
     struct {

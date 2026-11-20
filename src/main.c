@@ -39,10 +39,19 @@ static struct wl_event_source *session_xwayland_timeout = NULL;
 static int child_pipe[2] = {-1, -1};
 static struct wl_event_source *child_source;
 
+/* long-only options, out of the char range */
+enum {
+    OPT_NO_DEFAULT_KEYBIND = 0x100,
+};
+
 static const struct option long_options[] = {
-    { "help", no_argument, NULL, 'h' },    { "debug", no_argument, NULL, 'd' },
-    { "version", no_argument, NULL, 'v' }, { "session", required_argument, NULL, 's' },
-    { "verbose", no_argument, NULL, 'V' }, { 0, 0, 0, 0 },
+    { "help", no_argument, NULL, 'h' },
+    { "debug", no_argument, NULL, 'd' },
+    { "version", no_argument, NULL, 'v' },
+    { "session", required_argument, NULL, 's' },
+    { "verbose", no_argument, NULL, 'V' },
+    { "no-default-keybind", no_argument, NULL, OPT_NO_DEFAULT_KEYBIND },
+    { 0, 0, 0, 0 },
 };
 
 static const char usage[] =
@@ -54,6 +63,10 @@ static const char usage[] =
     "  -s, --session <process>  Run session on startup.\n"
     "  -v, --version            Show the version number and quit.\n"
     "  -V, --verbose            Enables more verbose logging.\n"
+    "      --no-default-keybind Register no key bindings on startup, neither the\n"
+    "                           built-in ones nor those in the InputAction config.\n"
+    "                           Bindings added at runtime (InputAction D-Bus,\n"
+    "                           KGlobalAccel) still work.\n"
     "\n";
 
 static bool detect_suid(void)
@@ -303,6 +316,9 @@ int main(int argc, char *argv[])
             break;
         case 'V': // verbose
             enable_verbose = true;
+            break;
+        case OPT_NO_DEFAULT_KEYBIND:
+            server.options.no_default_keybind = true;
             break;
         default:
             fprintf(stderr, "%s", usage);

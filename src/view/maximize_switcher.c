@@ -607,6 +607,10 @@ static void shortcut_action(struct key_binding *binding, void *data)
 
 static void switcher_register_shortcuts(void)
 {
+    if (kywc_key_binding_defaults_disabled()) {
+        return;
+    }
+
     for (size_t i = 0; i < sizeof(shortcuts) / sizeof(struct shortcut); i++) {
         struct shortcut *shortcut = &shortcuts[i];
         struct key_binding *binding = kywc_key_binding_create(shortcut->keybind, shortcut->desc);

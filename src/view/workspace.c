@@ -234,7 +234,10 @@ static void gestures_action(struct gesture_binding *binding, void *data, double 
 
 static void workspace_register_shortcut(void)
 {
-    for (size_t i = 0; i < sizeof(shortcuts) / sizeof(struct shortcut); i++) {
+    /* gestures are not key bindings, they stay */
+    for (size_t i = 0;
+         !kywc_key_binding_defaults_disabled() && i < sizeof(shortcuts) / sizeof(struct shortcut);
+         i++) {
         struct shortcut *shortcut = &shortcuts[i];
         struct key_binding *binding = kywc_key_binding_create(shortcut->keybind, shortcut->desc);
         if (!binding) {
