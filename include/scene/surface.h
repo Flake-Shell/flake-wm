@@ -37,7 +37,7 @@ struct ky_scene_surface {
 
     struct ky_scene_node_interface buffer_default_impl;
 
-    /* buffer opacity is driven by wp_alpha_modifier_v1 */
+    /* buffer opacity is driven by wp_alpha_modifier_v1 or hyprland_surface_v1 */
     bool alpha_modified;
 };
 
@@ -55,6 +55,12 @@ struct ky_scene_buffer *ky_scene_buffer_try_from_surface(struct wlr_surface *wlr
 
 /* wp_fifo_v1, see scene/fifo.c */
 bool fifo_manager_create(struct wl_display *display);
+
+/* hyprland_surface_manager_v1, see scene/hyprland_surface.c */
+bool hyprland_surface_manager_create(struct wl_display *display);
+
+/* the opacity set through hyprland_surface_v1, false if the surface has none */
+bool hyprland_surface_get_opacity(struct wlr_surface *surface, float *opacity);
 
 /* wp_commit_timing_v1, see scene/commit_timing.c */
 bool commit_timing_manager_create(struct wl_display *display);

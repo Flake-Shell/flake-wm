@@ -223,17 +223,24 @@ static void scene_surface_signal_release(struct ky_scene_surface *surface)
 }
 
 /**
- * wp_alpha_modifier_v1: the multiplier is double-buffered surface state.
- * Only touch the buffer opacity while the client uses the protocol, so
+ * wp_alpha_modifier_v1 and hyprland_surface_v1: the multipliers are
+ * double-buffered surface state, and the buffer opacity is their product.
+ * Only touch the buffer opacity while the client uses one of them, so
  * opacity set by the compositor (xwayland _NET_WM_WINDOW_OPACITY ...) is kept,
- * and restore it once the alpha modifier object is gone.
+ * and restore it once both objects are gone. The hyprland opacity also fades
+ * the blur behind the surface.
  */
 static void scene_surface_update_alpha(struct ky_scene_surface *surface)
 {
     const struct wlr_alpha_modifier_surface_v1_state *alpha =
         wlr_alpha_modifier_v1_get_surface_state(surface->surface);
-    if (alpha) {
-        ky_scene_buffer_set_opacity(surface->buffer, alpha->multiplier);
+    float hyprland_opacity = 1.0f;
+    bool hyprland = hyprland_surface_get_opacity(surface->surface, &hyprland_opacity);
+    ky_scene_buffer_set_blur_opacity(surface->buffer, hyprland_opacity);
+
+    if (alpha || hyprland) {
+        float multiplier = alpha ? alpha->multiplier : 1.0f;
+        ky_scene_buffer_set_opacity(surface->buffer, multiplier * hyprland_opacity);
         surface->alpha_modified = true;
     } else if (surface->alpha_modified) {
         ky_scene_buffer_set_opacity(surface->buffer, 1.0f);

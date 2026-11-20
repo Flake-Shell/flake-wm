@@ -5,6 +5,7 @@ target_sources(flakewm PRIVATE
   commit_timing.c
   decoration.c
   fifo.c
+  hyprland_surface.c
   output.c
   rect.c
   render.c

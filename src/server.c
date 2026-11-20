@@ -337,6 +337,7 @@ static bool wlroots_server_init(struct server *server)
     /* readiness constraints, see scene/fifo.c and scene/commit_timing.c */
     fifo_manager_create(server->display);
     commit_timing_manager_create(server->display);
+    hyprland_surface_manager_create(server->display);
 
     return true;
 }
