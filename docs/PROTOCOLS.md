@@ -26,8 +26,8 @@ wayland协议支持情况
 | :-------------------- | :------: | :---- |
 | wp_presentation       |    2     | 3     |
 | wp_viewporter         |    1     |       |
-| xdg_wm_base           |    5     | 7     |
-| zwp_linux_dmabuf_v1   |    4     | 6     |
+| xdg_wm_base           |    7     | 最小化或不在当前工作区时发送 suspended；不发送 constrained |
+| zwp_linux_dmabuf_v1   |    5     | 6     |
 | zwp_tablet_manager_v2 |    1     | 2     |
 
 ### staging
@@ -103,7 +103,7 @@ wayland协议支持情况
 | zwlr_foreign_toplevel_manager_v1 |    3     |            |
 | zwlr_gamma_control_manager_v1    |    1     |            |
 | zwlr_input_inhibit_manager_v1    |    -     | deprecated |
-| zwlr_layer_shell_v1              |    4     | 5          |
+| zwlr_layer_shell_v1              |    5     | 保留区按 exclusive_edge 计算 |
 | zwlr_output_manager_v1           |    4     |            |
 | zwlr_output_power_manager_v1     |    1     |            |
 | zwlr_screencopy_manager_v1       |    3     |            |
