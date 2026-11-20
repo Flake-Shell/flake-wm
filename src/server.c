@@ -9,8 +9,6 @@
 
 #include <pango/pangocairo.h>
 #include <fontconfig/fontconfig.h>
-#include <systemd/sd-bus.h>
-#include <systemd/sd-login.h>
 
 #include <wlr/backend.h>
 #include <wlr/backend/headless.h>

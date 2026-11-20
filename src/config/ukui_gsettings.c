@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-1.0-or-later
 
 #include <gio/gio.h>
+#include <stdio.h>
 
 #include "config_p.h"
 #include "effect/effect.h"

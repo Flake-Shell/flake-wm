@@ -2,7 +2,11 @@
 //
 // SPDX-License-Identifier: GPL-1.0-or-later
 
+#if HAVE_BASU
+#include <basu/sd-bus.h>
+#else
 #include <systemd/sd-bus.h>
+#endif
 #include <wayland-server-core.h>
 
 #define CK(v)                                                                                      \

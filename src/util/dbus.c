@@ -61,6 +61,33 @@ static char *strdup_or_null(const char *str)
     return str ? strdup(str) : NULL;
 }
 
+#if HAVE_BASU
+/* basu (FreeBSD) lacks these two, same behaviour as libsystemd */
+static sd_bus *sd_bus_close_unref(sd_bus *bus)
+{
+    if (bus) {
+        sd_bus_close(bus);
+        sd_bus_unref(bus);
+    }
+    return NULL;
+}
+
+static int sd_bus_emit_signalv(sd_bus *bus, const char *path, const char *interface,
+                               const char *member, const char *types, va_list ap)
+{
+    sd_bus_message *msg = NULL;
+    int ret = sd_bus_message_new_signal(bus, &msg, path, interface, member);
+    if (ret >= 0 && types && *types) {
+        ret = sd_bus_message_appendv(msg, types, ap);
+    }
+    if (ret >= 0) {
+        ret = sd_bus_send(bus, msg, NULL);
+    }
+    sd_bus_message_unref(msg);
+    return ret;
+}
+#endif
+
 static void dbus_disconnect(bool system)
 {
     if (system) {

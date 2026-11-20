@@ -2,7 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-1.0-or-later
 
+#ifndef __FreeBSD__  // FreeBSD hides sa_sigaction and SA_SIGINFO under plain POSIX
 #define _POSIX_C_SOURCE 200809L
+#endif
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>

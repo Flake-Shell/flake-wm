@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-1.0-or-later
 
+#include <stdio.h>
 #include <stdlib.h>
 
 #include <wlr/types/wlr_buffer.h>

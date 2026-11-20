@@ -2,13 +2,19 @@
 //
 // SPDX-License-Identifier: GPL-1.0-or-later
 
+#ifndef __FreeBSD__
 #define _POSIX_C_SOURCE 200809L
+#endif
 #include <assert.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#ifdef __FreeBSD__
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#endif
 
 #include <wlr/types/wlr_security_context_v1.h>
 
@@ -35,6 +41,20 @@ struct security_manager {
 
 static struct security_manager *manager = NULL;
 
+#ifdef __FreeBSD__
+/* no /proc by default, ask the kernel */
+static char *get_path_from_pid(const pid_t pid)
+{
+    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, pid };
+    char path[PATH_MAX];
+    size_t len = sizeof(path);
+    if (sysctl(mib, 4, path, &len, NULL, 0) != 0) {
+        kywc_log_errno(KYWC_ERROR, "pid(%d) could not get its executable", pid);
+        return NULL;
+    }
+    return strdup(path);
+}
+#else
 static char *get_path_from_pid(const pid_t pid)
 {
     char link_file[32];
@@ -67,6 +87,7 @@ static char *get_path_from_pid(const pid_t pid)
 
     return link_target;
 }
+#endif
 
 static void handle_client_destroy(struct wl_listener *listener, void *data)
 {

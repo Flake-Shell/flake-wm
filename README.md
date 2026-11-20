@@ -297,6 +297,20 @@ Options are passed as `-D<option>=<value>`, e.g. `-DWLCOM_EXAMPLES=OFF -DWLCOM_U
 
 
 
+#### FreeBSD
+
+FreeBSD 15 and later are supported. sd-bus comes from `devel/basu`, libudev from `devel/libudev-devd`; the fbdev backend and the GXDE session launcher (`startflakewm`, which runs `startdde`) are Linux only and are not built. The port lives in [freebsd/](./freebsd); to build a package from this checkout instead of the release tarball:
+
+```sh
+# cp -R freebsd /usr/ports/x11-wm/flakewm
+# cd /usr/ports/x11-wm/flakewm
+# make FLAKEWM_SRC=/path/to/flake-wm package
+```
+
+The system-wide defaults are installed to `/usr/local/etc/flakewm/config.json`. The compositor opens the GPU and input devices through `seatd` (`sysrc seatd_enable=YES`).
+
+
+
 #### Manual build (build script)
 
 The build script is located at [./build-deb](./build-deb). It is a shell script used to generate install packages during debugging, making it easy to deploy and uninstall on a debugging machine.

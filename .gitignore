@@ -702,6 +702,8 @@ ui_*.h
 *.qmlc
 *.jsc
 Makefile*
+# the FreeBSD port
+!/freebsd/Makefile
 *build-*
 *.qm
 *.prl

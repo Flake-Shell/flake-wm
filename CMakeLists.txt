@@ -40,6 +40,7 @@ set_property(CACHE WLCOM_LIBUNWIND WLCOM_NLS WLCOM_LIBEIS PROPERTY STRINGS
 option(WLCOM_EXAMPLES "Build example applications" ON)
 option(WLCOM_LIBKYWC "Build libkywc for client" ON)
 option(WLCOM_TRACY "Enable tracy profiler" OFF)
+option(WLCOM_GXDE_SESSION "Install the GXDE session launcher (startflakewm)" ON)
 set(WLCOM_EXTRA_ICON_PATH "" CACHE STRING "Add extra icon path")
 set(WLCOM_EXTRA_APPS_PATH "" CACHE STRING "Add extra apps path")
 
@@ -173,7 +174,6 @@ pkg_check_modules(WLCOM_DEPS REQUIRED IMPORTED_TARGET
   pixman-1
   xcb
   "json-c>=0.13"
-  libsystemd
   cairo
   pango
   pangocairo
@@ -210,6 +210,20 @@ if(NOT WLCOM_LIBUNWIND STREQUAL "disabled")
     pkg_check_modules(LIBUNWIND QUIET IMPORTED_TARGET libunwind)
   endif()
   set(HAVE_LIBUNWIND ${LIBUNWIND_FOUND})
+endif()
+
+# Linux is the primary target and keeps its paths and dependencies. FreeBSD
+# has no framebuffer backend, takes sd-bus from basu and installs under PREFIX.
+if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+  set(HAVE_FBDEV OFF)
+  set(HAVE_BASU ON)
+  pkg_check_modules(SDBUS REQUIRED IMPORTED_TARGET basu)
+  set(WLCOM_SYSCONFDIR "${CMAKE_INSTALL_FULL_SYSCONFDIR}/flakewm")
+else()
+  set(HAVE_FBDEV ON)
+  set(HAVE_BASU OFF)
+  pkg_check_modules(SDBUS REQUIRED IMPORTED_TARGET libsystemd)
+  set(WLCOM_SYSCONFDIR "/etc/flakewm")
 endif()
 
 set(HAVE_LIBEIS OFF)
@@ -259,11 +273,14 @@ add_compile_definitions(
   "KYWC_VERSION=\"${WLCOM_VERSION_STRING}\""
   WLR_USE_UNSTABLE
   "PLUGIN_DIR=\"${WLCOM_PLUGIN_DIR}\""
+  "WLCOM_SYSCONFDIR=\"${WLCOM_SYSCONFDIR}\""
 )
 
 wlcom_define_bool(HAVE_XWAYLAND HAVE_XWAYLAND)
 wlcom_define_bool(HAVE_LIBUNWIND HAVE_LIBUNWIND)
 wlcom_define_bool(HAVE_LIBEIS HAVE_LIBEIS)
+wlcom_define_bool(HAVE_BASU HAVE_BASU)
+wlcom_define_bool(HAVE_FBDEV HAVE_FBDEV)
 foreach(name IN LISTS wlcom_feature_names)
   wlcom_define_bool(HAVE_${name} WLCOM_${name})
 endforeach()

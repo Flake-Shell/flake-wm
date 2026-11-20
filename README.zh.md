@@ -291,6 +291,20 @@ $ sudo cmake --install build
 
 
 
+#### FreeBSD
+
+支持FreeBSD 15及以上。sd-bus由`devel/basu`提供，libudev由`devel/libudev-devd`提供；fbdev后端与GXDE会话启动脚本(`startflakewm`，它会启动`startdde`)仅限Linux，不会编译。Port位于[freebsd/](./freebsd)，用当前源码树(而非发布tarball)打包:
+
+```sh
+# cp -R freebsd /usr/ports/x11-wm/flakewm
+# cd /usr/ports/x11-wm/flakewm
+# make FLAKEWM_SRC=/path/to/flake-wm package
+```
+
+系统默认配置安装在`/usr/local/etc/flakewm/config.json`。合成器通过`seatd`打开显卡与输入设备(`sysrc seatd_enable=YES`)。
+
+
+
 #### 手动编辑 (构建脚本)
 
 构建脚本位于[./build-deb](./build-deb), 这是个shell脚本，用于在调试时生成安装包，便于在调试机器上轻松部署与卸载。

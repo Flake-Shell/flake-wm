@@ -49,6 +49,7 @@ target_link_libraries(flakewm PRIVATE
   Wlroots::wlroots
   PkgConfig::WAYLAND_SERVER
   PkgConfig::WLCOM_DEPS
+  PkgConfig::SDBUS
   Threads::Threads
   m
   dl
@@ -73,6 +74,10 @@ endif()
 
 # Plugins resolve compositor symbols at load time, see wlcom.syms.
 set(wlcom_symbols_file "${PROJECT_SOURCE_DIR}/wlcom.syms")
+if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+  # also keeps environ and __progname, which live in the executable there
+  set(wlcom_symbols_file "${PROJECT_SOURCE_DIR}/wlcom.freebsd.syms")
+endif()
 set_target_properties(flakewm PROPERTIES
   # Keep ./build/flakewm working for nested test runs.
   RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}"

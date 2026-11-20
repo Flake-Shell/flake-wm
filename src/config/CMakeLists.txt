@@ -6,6 +6,12 @@ target_sources(flakewm PRIVATE
 
 if(WLCOM_KDE_GLOBAL_ACCEL)
   add_executable(qtkey-mapper qtkey_mapper.c)
+  if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+    # the xkbcommon keysym header is under /usr/local/include there
+    target_include_directories(qtkey-mapper PRIVATE
+      $<TARGET_PROPERTY:PkgConfig::WLCOM_DEPS,INTERFACE_INCLUDE_DIRECTORIES>
+    )
+  endif()
   wlcom_capture_header(flakewm qtkey_map_table.h qtkey-mapper)
 
   target_sources(flakewm PRIVATE

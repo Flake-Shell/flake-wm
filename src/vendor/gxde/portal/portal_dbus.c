@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <systemd/sd-bus.h>
 
 #include <kywc/log.h>
 
