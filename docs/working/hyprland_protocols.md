@@ -34,11 +34,10 @@ global 存在、尚未用客户端实际操作过。
 | `wp_pointer_warp_v1` | 1 | `src/input/pointer_warp.c` | 需拥有指针焦点、serial 有效、位置在 surface 内；锁屏或合成器 grab 期间忽略 | 广播 |
 | `ext_background_effect_manager_v1` | 1 | `src/view/ext_background_effect.c` | 复用 kde blur 的 scene 模糊；空区域即无模糊 | 广播 |
 
-## 2. 缺失：Hyprland 私有协议（hyprland-protocols）
+## 2. Hyprland 私有协议（hyprland-protocols）
 
 | 全局接口 | Hyprland 版本 | 用途 |
 | :-- | :--: | :-- |
-| `hyprland_global_shortcuts_manager_v1` | 1 | xdg-desktop-portal-hyprland 的 GlobalShortcuts portal |
 | `hyprland_toplevel_export_manager_v1` | 2 | 单窗口截图/录屏（xdph 窗口共享） |
 | `hyprland_toplevel_mapping_manager_v1` | 1 | foreign-toplevel handle 与窗口地址的映射 |
 | `hyprland_focus_grab_manager_v1` | 1 | 弹出层抢焦点（quickshell/ags 等 shell 弹窗） |

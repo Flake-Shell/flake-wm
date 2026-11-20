@@ -159,6 +159,8 @@ static const char *const privileged_interfaces[] = {
     "zwp_keyboard_shortcuts_inhibit_manager_v1",
     "ext_transient_seat_manager_v1",
     "org_kde_kwin_keystate",
+    /* sandboxed apps use the GlobalShortcuts portal instead */
+    "hyprland_global_shortcuts_manager_v1",
     /* window and workspace management */
     "zwlr_foreign_toplevel_manager_v1",
     "ext_foreign_toplevel_list_v1",

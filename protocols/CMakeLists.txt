@@ -30,6 +30,7 @@ set(protocols
   wp-commit-timing-v1 ${WL_PROTOCOL_DIR}/staging/commit-timing/commit-timing-v1.xml
   wp-pointer-warp-v1 ${WL_PROTOCOL_DIR}/staging/pointer-warp/pointer-warp-v1.xml
   ext-background-effect-v1 ${WL_PROTOCOL_DIR}/staging/ext-background-effect/ext-background-effect-v1.xml
+  hyprland-global-shortcuts-v1 hyprland-global-shortcuts-v1.xml
 )
 
 list(APPEND protocols
