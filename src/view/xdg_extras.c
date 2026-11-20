@@ -61,6 +61,10 @@ static void handle_bell_destroy(struct wl_listener *listener, void *data)
 static void handle_set_tag(struct wl_listener *listener, void *data)
 {
     struct wlr_xdg_toplevel_tag_manager_v1_set_tag_event *event = data;
+    /* NULL for a toplevel whose surface is already gone */
+    if (!event->toplevel) {
+        return;
+    }
     kywc_log(KYWC_DEBUG, "toplevel(app_id=%s) tag set to %s",
              event->toplevel->app_id ? event->toplevel->app_id : "", event->tag);
 }
@@ -68,6 +72,10 @@ static void handle_set_tag(struct wl_listener *listener, void *data)
 static void handle_set_description(struct wl_listener *listener, void *data)
 {
     struct wlr_xdg_toplevel_tag_manager_v1_set_description_event *event = data;
+    /* NULL for a toplevel whose surface is already gone */
+    if (!event->toplevel) {
+        return;
+    }
     kywc_log(KYWC_DEBUG, "toplevel(app_id=%s) description set to %s",
              event->toplevel->app_id ? event->toplevel->app_id : "", event->description);
 }

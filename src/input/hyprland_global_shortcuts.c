@@ -234,6 +234,17 @@ static void manager_handle_register_shortcut(struct wl_client *client,
     shortcut->id = strdup(shortcut_id);
     shortcut->description = strdup(description);
     shortcut->trigger_description = strdup(trigger_description);
+    if (!shortcut->app_id || !shortcut->id || !shortcut->description ||
+        !shortcut->trigger_description) {
+        free(shortcut->app_id);
+        free(shortcut->id);
+        free(shortcut->description);
+        free(shortcut->trigger_description);
+        wl_resource_destroy(shortcut->resource);
+        free(shortcut);
+        wl_client_post_no_memory(client);
+        return;
+    }
     wl_list_insert(manager->shortcuts.prev, &shortcut->link);
     wl_resource_set_implementation(shortcut->resource, &shortcut_impl, shortcut,
                                    shortcut_handle_resource_destroy);

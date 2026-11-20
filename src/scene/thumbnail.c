@@ -504,7 +504,9 @@ static void view_thumbnail_destroy(struct thumbnail_buffer *thumbnail_buffer)
     }
 
     struct view_thumbnail *view_thumbnail = wl_container_of(thumbnail_buffer, view_thumbnail, base);
-    ky_scene_node_force_damage_event(view_thumbnail->source_node, false);
+    if (view_thumbnail->source_node) {
+        ky_scene_node_force_damage_event(view_thumbnail->source_node, false);
+    }
 
     wl_list_remove(&view_thumbnail->view_unmap.link);
     wl_list_remove(&view_thumbnail->source_damage.link);
@@ -513,10 +515,19 @@ static void view_thumbnail_destroy(struct thumbnail_buffer *thumbnail_buffer)
     free(view_thumbnail);
 }
 
+/*
+ * A source can go away while its thumbnail is being rendered, then the destroy is
+ * deferred until the render is done. Leave the source's signals right away, the
+ * deferred destroy must not touch the source any more.
+ */
 static void node_thumbnail_handle_source_destroy(struct wl_listener *listener, void *data)
 {
     struct node_thumbnail *node_thumbnail =
         wl_container_of(listener, node_thumbnail, source_destroy);
+    wl_list_remove(&node_thumbnail->source_destroy.link);
+    wl_list_init(&node_thumbnail->source_destroy.link);
+    wl_list_remove(&node_thumbnail->source_damage.link);
+    wl_list_init(&node_thumbnail->source_damage.link);
     /* force destroyed when source node destroy */
     node_thumbnail->base.need_destroy = true;
     node_thumbnail_destroy(&node_thumbnail->base);
@@ -525,6 +536,12 @@ static void node_thumbnail_handle_source_destroy(struct wl_listener *listener, v
 static void view_thumbnail_handle_source_destroy(struct wl_listener *listener, void *data)
 {
     struct view_thumbnail *view_thumbnail = wl_container_of(listener, view_thumbnail, view_unmap);
+    ky_scene_node_force_damage_event(view_thumbnail->source_node, false);
+    view_thumbnail->source_node = NULL;
+    wl_list_remove(&view_thumbnail->view_unmap.link);
+    wl_list_init(&view_thumbnail->view_unmap.link);
+    wl_list_remove(&view_thumbnail->source_damage.link);
+    wl_list_init(&view_thumbnail->source_damage.link);
     /* force destroyed when source node destroy */
     view_thumbnail->base.need_destroy = true;
     view_thumbnail_destroy(&view_thumbnail->base);
@@ -734,7 +751,9 @@ static void workspace_thumbnail_destroy(struct thumbnail_buffer *thumbnail_buffe
     wl_list_remove(&workspace_thumbnail->output_destroy.link);
     wl_list_remove(&workspace_thumbnail->workspace_destroy.link);
     wl_list_remove(&workspace_thumbnail->link);
-    workspace_update_force_damage(workspace_thumbnail->workspace);
+    if (workspace_thumbnail->workspace) {
+        workspace_update_force_damage(workspace_thumbnail->workspace);
+    }
 
     free(workspace_thumbnail);
 }
@@ -840,10 +859,23 @@ static void workspace_thumbnail_handle_view_minimize(struct wl_listener *listene
     thumbnail_manager_schedule_frame();
 }
 
+/* the destroy may be deferred while rendering, don't stay on the dying source's signals */
+static void workspace_thumbnail_detach_sources(struct workspace_thumbnail *workspace_thumbnail)
+{
+    wl_list_remove(&workspace_thumbnail->view_enter.link);
+    wl_list_init(&workspace_thumbnail->view_enter.link);
+    wl_list_remove(&workspace_thumbnail->output_destroy.link);
+    wl_list_init(&workspace_thumbnail->output_destroy.link);
+    wl_list_remove(&workspace_thumbnail->workspace_destroy.link);
+    wl_list_init(&workspace_thumbnail->workspace_destroy.link);
+    workspace_thumbnail->workspace = NULL;
+}
+
 static void workspace_thumbnail_handle_output_destroy(struct wl_listener *listener, void *data)
 {
     struct workspace_thumbnail *workspace_thumbnail =
         wl_container_of(listener, workspace_thumbnail, output_destroy);
+    workspace_thumbnail_detach_sources(workspace_thumbnail);
     workspace_thumbnail->base.need_destroy = true;
     workspace_thumbnail_destroy(&workspace_thumbnail->base);
 }
@@ -853,6 +885,7 @@ static void workspace_thumbnail_handle_source_destroy(struct wl_listener *listen
     struct workspace_thumbnail *workspace_thumbnail =
         wl_container_of(listener, workspace_thumbnail, workspace_destroy);
     /* force destroyed when source node destroy */
+    workspace_thumbnail_detach_sources(workspace_thumbnail);
     workspace_thumbnail->base.need_destroy = true;
     workspace_thumbnail_destroy(&workspace_thumbnail->base);
 }
@@ -1051,6 +1084,10 @@ static void output_thumbnail_handle_output_destroy(struct wl_listener *listener,
 {
     struct output_thumbnail *output_thumbnail =
         wl_container_of(listener, output_thumbnail, output_destroy);
+    wl_list_remove(&output_thumbnail->output_destroy.link);
+    wl_list_init(&output_thumbnail->output_destroy.link);
+    wl_list_remove(&output_thumbnail->output_commit.link);
+    wl_list_init(&output_thumbnail->output_commit.link);
     /* force destroyed when output node destroy */
     output_thumbnail->base.need_destroy = true;
     output_thumbnail_destroy(&output_thumbnail->base);
@@ -1556,6 +1593,11 @@ struct thumbnail *thumbnail_create_from_workspace_scene(struct workspace *worksp
                                                         bool windows_only)
 {
     if (!manager || !kywc_output) {
+        return NULL;
+    }
+    /* an output that failed to join the layout has no scene output to render from */
+    struct output *output = output_from_kywc_output(kywc_output);
+    if (!output->scene_output) {
         return NULL;
     }
 

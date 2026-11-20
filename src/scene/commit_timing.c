@@ -16,6 +16,7 @@
 
 #define _POSIX_C_SOURCE 200809L
 #include <assert.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -161,7 +162,9 @@ static void commit_timer_handle_surface_client_commit(struct wl_listener *listen
     commit->seq = wlr_surface_lock_pending(timer->surface);
     commit->surface_destroy.notify = timed_commit_handle_surface_destroy;
     wl_signal_add(&timer->surface->events.destroy, &commit->surface_destroy);
-    wl_event_source_timer_update(commit->timer, (int)(delay_ns / NSEC_PER_MSEC));
+    /* a timestamp days ahead would wrap the int and disarm the timer, holding commits forever */
+    int64_t delay_ms = delay_ns / NSEC_PER_MSEC;
+    wl_event_source_timer_update(commit->timer, delay_ms > INT_MAX ? INT_MAX : (int)delay_ms);
 }
 
 static void commit_timer_detach_surface(struct commit_timer *timer)

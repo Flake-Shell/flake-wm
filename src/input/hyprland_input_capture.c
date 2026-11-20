@@ -76,6 +76,7 @@ static struct capture_manager {
     struct wl_list sessions;
     struct capture_session *active;
     struct seat *seat;  // the seat whose input is captured
+    struct wl_listener seat_destroy;
 
     /* forwarded presses, released on the EIS side when the capture ends */
     struct held keys, buttons;
@@ -447,6 +448,29 @@ void input_capture_force_release(void)
     }
 }
 
+/*
+ * A transient seat can go away at any time. Other destroy listeners may already have
+ * torn down parts of it (its cursor's selection state), so forget the seat before
+ * ending the capture: the release then leaves the dying seat's keyboard and cursor alone.
+ */
+static void handle_seat_destroy(struct wl_listener *listener, void *data)
+{
+    wl_list_remove(&manager->seat_destroy.link);
+    wl_list_init(&manager->seat_destroy.link);
+    manager->seat = NULL;
+    input_capture_force_release();
+}
+
+static void manager_set_seat(struct seat *seat)
+{
+    if (manager->seat == seat) {
+        return;
+    }
+    wl_list_remove(&manager->seat_destroy.link);
+    wl_signal_add(&seat->events.destroy, &manager->seat_destroy);
+    manager->seat = seat;
+}
+
 bool input_capture_is_active(void)
 {
     return manager && manager->active;
@@ -563,7 +587,7 @@ bool input_capture_handle_motion(struct seat *seat, double lx, double ly, double
                                     nx, ny)) {
                 continue;
             }
-            manager->seat = seat;
+            manager_set_seat(seat);
             if (!session_activate(session, nx, ny, barrier->id)) {
                 return false;
             }
@@ -942,6 +966,7 @@ static void handle_configured(struct wl_listener *listener, void *data)
 static void handle_display_destroy(struct wl_listener *listener, void *data)
 {
     wl_list_remove(&manager->configured.link);
+    wl_list_remove(&manager->seat_destroy.link);
     wl_list_remove(&manager->display_destroy.link);
     wl_event_source_remove(manager->repeat_timer);
     wl_global_destroy(manager->global);
@@ -956,6 +981,8 @@ bool hyprland_input_capture_manager_create(struct input_manager *input_manager)
         return false;
     }
     wl_list_init(&manager->sessions);
+    manager->seat_destroy.notify = handle_seat_destroy;
+    wl_list_init(&manager->seat_destroy.link);
 
     struct server *server = input_manager->server;
     manager->repeat_timer = wl_event_loop_add_timer(server->event_loop, handle_repeat, NULL);
