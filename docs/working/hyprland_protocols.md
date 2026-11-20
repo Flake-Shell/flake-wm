@@ -36,9 +36,7 @@ global 存在、尚未用客户端实际操作过。
 
 ## 2. Hyprland 私有协议（hyprland-protocols）
 
-| 全局接口 | Hyprland 版本 | 用途 |
-| :-- | :--: | :-- |
-| `hyprland_input_capture_manager_v1` | 2 | xdph InputCapture portal（Deskflow/Barrier 等） |
+已全部实现，见 `docs/PROTOCOLS.md` 的 hyprland 一节。
 
 ## 3. 缺失：其他第三方协议
 

@@ -338,6 +338,7 @@ void seat_reset_input_gesture(struct seat *seat)
 void seat_cancel_grabs(struct seat *seat)
 {
     focus_grab_cancel(seat);
+    input_capture_force_release();
     while (seat->pointer_grab || seat->keyboard_grab || seat->touch_grab) {
         if (seat->pointer_grab) {
             struct seat_pointer_grab *grab = seat->pointer_grab;

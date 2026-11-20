@@ -14,7 +14,7 @@ license=('GPL-1.0-or-later' 'GPL-2.0-or-later' 'GPL-3.0-or-later' 'LGPL-2.1-or-l
 makedepends=('git' 'cmake' 'ninja' 'meson' 'pkgconf' 'gettext' 'glslang' 'hwdata' 'systemd' 'vulkan-headers'
              'wayland-protocols' 'qt6-base' 'qt6-declarative' 'qt6-5compat' 'cairo' 'glib2' 'json-c'
              'libdisplay-info' 'libdrm' 'libepoxy' 'libglvnd' 'libinput' 'libjpeg-turbo' 'libliftoff' 'libpng'
-             'librsvg' 'libunwind' 'libxcb' 'libxkbcommon' 'mesa' 'openssl' 'pango' 'pixman' 'seatd'
+             'librsvg' 'libei' 'libunwind' 'libxcb' 'libxkbcommon' 'mesa' 'openssl' 'pango' 'pixman' 'seatd'
              'vulkan-icd-loader' 'wayland' 'xcb-util-errors' 'xcb-util-renderutil' 'xcb-util-wm'
              'xorg-xwayland')
 source=()
@@ -51,7 +51,7 @@ _pick() {
 
 package_flakewm() {
   depends=('cairo' 'glib2' 'json-c' 'libdisplay-info' 'libdrm' 'libepoxy' 'libglvnd' 'libinput'
-           'libjpeg-turbo' 'libliftoff' 'libpng' 'librsvg' 'libunwind' 'libxcb' 'libxkbcommon' 'mesa'
+           'libjpeg-turbo' 'libliftoff' 'libpng' 'librsvg' 'libei' 'libunwind' 'libxcb' 'libxkbcommon' 'mesa'
            'openssl' 'pango' 'pixman' 'seatd' 'systemd-libs' 'vulkan-icd-loader' 'wayland' 'xcb-util-errors'
            'xcb-util-renderutil' 'xcb-util-wm' 'xorg-xwayland' 'libgcc' 'libstdc++' 'glibc')
   provides=("flakewm-git=$pkgver")

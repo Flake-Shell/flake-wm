@@ -181,7 +181,7 @@ wayland协议支持情况
 | hyprland_surface_manager_v1          |    2     | visible region 仅接受，不裁剪              |
 | hyprland_lock_notifier_v1            |    1     |                                            |
 | hyprland_workspace_image_capture_source_manager_v1 | 1 | 工作区跨所有输出，按主输出截取 |
-| hyprland_input_capture_manager_v1    |    no    | 2                                          |
+| hyprland_input_capture_manager_v1    |    2     | 需 libeis；屏障只能放在输出外边缘；Super+Shift+Escape 强制释放，锁屏或输出布局变化时也会释放 |
 
 ## gxwm
 | 协议名称                   | 支持情况 | 说明 |

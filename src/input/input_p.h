@@ -137,6 +137,72 @@ bool focus_grab_handle_button(struct seat *seat, uint32_t button, bool pressed);
 /* true if the touch down is swallowed: a touch outside the grab ends it */
 bool focus_grab_handle_touch_down(struct seat *seat, struct wlr_surface *surface);
 
+/* hyprland_input_capture_manager_v1, see hyprland_input_capture.c */
+#if HAVE_LIBEIS
+bool hyprland_input_capture_manager_create(struct input_manager *input_manager);
+
+/* true while input goes to an input capture session instead of the clients */
+bool input_capture_is_active(void);
+
+/* end a capture, as on Super+Shift+Escape */
+void input_capture_force_release(void);
+
+/* each returns true if the event went to the capture session */
+bool input_capture_handle_motion(struct seat *seat, double lx, double ly, double dx, double dy);
+
+bool input_capture_handle_button(uint32_t button, bool pressed);
+
+bool input_capture_handle_axis(enum wl_pointer_axis_source source, bool vertical, double delta,
+                               int32_t delta_discrete);
+
+bool input_capture_handle_frame(void);
+
+bool input_capture_handle_key(struct keyboard *keyboard, uint32_t key, bool pressed,
+                              uint32_t modifiers);
+
+bool input_capture_handle_modifiers(void);
+#else
+static inline bool input_capture_is_active(void)
+{
+    return false;
+}
+
+static inline void input_capture_force_release(void) {}
+
+static inline bool input_capture_handle_motion(struct seat *seat, double lx, double ly, double dx,
+                                               double dy)
+{
+    return false;
+}
+
+static inline bool input_capture_handle_button(uint32_t button, bool pressed)
+{
+    return false;
+}
+
+static inline bool input_capture_handle_axis(enum wl_pointer_axis_source source, bool vertical,
+                                             double delta, int32_t delta_discrete)
+{
+    return false;
+}
+
+static inline bool input_capture_handle_frame(void)
+{
+    return false;
+}
+
+static inline bool input_capture_handle_key(struct keyboard *keyboard, uint32_t key, bool pressed,
+                                            uint32_t modifiers)
+{
+    return false;
+}
+
+static inline bool input_capture_handle_modifiers(void)
+{
+    return false;
+}
+#endif
+
 bool seat_read_config(struct seat *seat);
 
 void seat_write_config(struct seat *seat);

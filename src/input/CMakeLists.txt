@@ -29,6 +29,12 @@ target_sources(flakewm PRIVATE
   selection_data.c
 )
 
+if(HAVE_LIBEIS)
+  target_sources(flakewm PRIVATE
+    hyprland_input_capture.c
+  )
+endif()
+
 if(WLCOM_KDE_KEYSTATE)
   target_sources(flakewm PRIVATE
     kde_keystate.c

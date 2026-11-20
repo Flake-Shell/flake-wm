@@ -160,6 +160,7 @@ static const char *const privileged_interfaces[] = {
     "zwp_input_method_manager_v2",
     "zwp_keyboard_shortcuts_inhibit_manager_v1",
     "hyprland_focus_grab_manager_v1",
+    "hyprland_input_capture_manager_v1",
     "ext_transient_seat_manager_v1",
     "org_kde_kwin_keystate",
     /* sandboxed apps use the GlobalShortcuts portal instead */

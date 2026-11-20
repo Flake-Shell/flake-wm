@@ -597,6 +597,9 @@ struct input_manager *input_manager_create(struct server *server)
     selection_manager_create_globals(input_manager);
     hyprland_global_shortcuts_create(input_manager);
     hyprland_focus_grab_manager_create(input_manager);
+#if HAVE_LIBEIS
+    hyprland_input_capture_manager_create(input_manager);
+#endif
 
     return input_manager;
 }
