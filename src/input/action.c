@@ -1194,7 +1194,7 @@ static void input_action_create_with_keyboard(struct input_action_manager *manag
         if (!kywc_key_binding_register(binding, action_data->binding_type,
                                        input_manager_keybinding_action, input_action)) {
             kywc_log(KYWC_DEBUG, "key_binding registion failed");
-            if (user) {
+            if (user && !manager->server->options.emergency_term_keybind) {
                 json_object_object_del(keyboard_obj, keybind);
             }
             kywc_key_binding_destroy(binding);

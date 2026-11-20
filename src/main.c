@@ -42,6 +42,7 @@ static struct wl_event_source *child_source;
 /* long-only options, out of the char range */
 enum {
     OPT_NO_DEFAULT_KEYBIND = 0x100,
+    OPT_EMERGENCY_TERM_KEYBIND,
 };
 
 static const struct option long_options[] = {
@@ -51,6 +52,7 @@ static const struct option long_options[] = {
     { "session", required_argument, NULL, 's' },
     { "verbose", no_argument, NULL, 'V' },
     { "no-default-keybind", no_argument, NULL, OPT_NO_DEFAULT_KEYBIND },
+    { "emergency-term-keybind", no_argument, NULL, OPT_EMERGENCY_TERM_KEYBIND },
     { 0, 0, 0, 0 },
 };
 
@@ -67,6 +69,8 @@ static const char usage[] =
     "                           built-in ones nor those in the InputAction config.\n"
     "                           Bindings added at runtime (InputAction D-Bus,\n"
     "                           KGlobalAccel) still work.\n"
+    "      --emergency-term-keybind\n"
+    "                           Bind Win+q to open a terminal.\n"
     "\n";
 
 static bool detect_suid(void)
@@ -319,6 +323,9 @@ int main(int argc, char *argv[])
             break;
         case OPT_NO_DEFAULT_KEYBIND:
             server.options.no_default_keybind = true;
+            break;
+        case OPT_EMERGENCY_TERM_KEYBIND:
+            server.options.emergency_term_keybind = true;
             break;
         default:
             fprintf(stderr, "%s", usage);

@@ -577,6 +577,7 @@ struct input_manager *input_manager_create(struct server *server)
     selection_manager_create(input_manager);
     input_monitor_create(input_manager);
     bindings_create(input_manager);
+    emergency_term_binding_create(input_manager);
     input_method_manager_create(input_manager);
 
     touch_manager_create(input_manager);

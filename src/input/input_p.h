@@ -107,6 +107,8 @@ bool cursor_shape_manager_create(struct input_manager *input_manager);
 
 bool pointer_warp_manager_create(struct input_manager *input_manager);
 
+void emergency_term_binding_create(struct input_manager *input_manager);
+
 /* hyprland_global_shortcuts_manager_v1, see hyprland_global_shortcuts.c */
 bool hyprland_global_shortcuts_create(struct input_manager *input_manager);
 
