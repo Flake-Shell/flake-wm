@@ -38,7 +38,6 @@ global 存在、尚未用客户端实际操作过。
 
 | 全局接口 | Hyprland 版本 | 用途 |
 | :-- | :--: | :-- |
-| `hyprland_toplevel_mapping_manager_v1` | 1 | foreign-toplevel handle 与窗口地址的映射 |
 | `hyprland_focus_grab_manager_v1` | 1 | 弹出层抢焦点（quickshell/ags 等 shell 弹窗） |
 | `hyprland_ctm_control_manager_v1` | 2 | 输出颜色变换矩阵（hyprsunset） |
 | `hyprland_surface_manager_v1` | 2 | 每 surface 不透明度 / 可见区域 |

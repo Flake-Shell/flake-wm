@@ -165,6 +165,7 @@ static const char *const privileged_interfaces[] = {
     /* window and workspace management */
     "zwlr_foreign_toplevel_manager_v1",
     "ext_foreign_toplevel_list_v1",
+    "hyprland_toplevel_mapping_manager_v1",
     "ext_workspace_manager_v1",
     "kywc_toplevel_manager_v1",
     "kywc_workspace_manager_v1",

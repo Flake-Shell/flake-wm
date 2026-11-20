@@ -9,6 +9,7 @@ target_sources(flakewm PRIVATE
   fade.c
   gxde_screenshot.c
   hyprland_toplevel_export.c
+  hyprland_toplevel_mapping.c
   locate_pointer.c
   magic_lamp.c
   mouse_click.c

@@ -34,6 +34,11 @@ bool gxde_screenshot_manager_create(struct server *server);
 
 bool hyprland_toplevel_export_manager_create(struct server *server);
 
+bool hyprland_toplevel_mapping_manager_create(struct server *server);
+
+/* the view of an ext_foreign_toplevel_handle_v1, NULL once it is closed */
+struct view *ext_foreign_toplevel_view_from_resource(struct wl_resource *resource);
+
 bool move_effect_create(struct effect_manager *effect_manager);
 
 bool blur_effect_create(struct effect_manager *effect_manager);

@@ -870,18 +870,22 @@ static void toplevel_list_bind(struct wl_client *client, void *data, uint32_t ve
     }
 }
 
+struct view *ext_foreign_toplevel_view_from_resource(struct wl_resource *resource)
+{
+    if (!resource || !wl_resource_instance_of(resource, &ext_foreign_toplevel_handle_v1_interface,
+                                              &toplevel_handle_impl)) {
+        return NULL;
+    }
+    struct ext_toplevel *toplevel = wl_resource_get_user_data(resource);
+    return toplevel ? toplevel->view : NULL;
+}
+
 static void toplevel_source_handle_create(struct wl_client *client, struct wl_resource *resource,
                                           uint32_t id, struct wl_resource *handle_resource)
 {
     struct ext_capture_manager *manager = wl_resource_get_user_data(resource);
-    struct ext_toplevel *toplevel = NULL;
-    if (handle_resource &&
-        wl_resource_instance_of(handle_resource, &ext_foreign_toplevel_handle_v1_interface,
-                                &toplevel_handle_impl)) {
-        toplevel = wl_resource_get_user_data(handle_resource);
-    }
     source_create(manager, client, id, EXT_SOURCE_TOPLEVEL,
-                  toplevel ? toplevel->view : NULL);
+                  ext_foreign_toplevel_view_from_resource(handle_resource));
 }
 
 static const struct ext_foreign_toplevel_image_capture_source_manager_v1_interface

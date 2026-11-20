@@ -175,7 +175,7 @@ wayland协议支持情况
 | :----------------------------------- | :------: | :----------------------------------------- |
 | hyprland_global_shortcuts_manager_v1 |    1     |       |
 | hyprland_toplevel_export_manager_v1  |    2     |                                            |
-| hyprland_toplevel_mapping_manager_v1 |    no    | 1                                          |
+| hyprland_toplevel_mapping_manager_v1 |    1     |                                            |
 | hyprland_focus_grab_manager_v1       |    no    | 1                                          |
 | hyprland_ctm_control_manager_v1      |    no    | 2                                          |
 | hyprland_surface_manager_v1          |    no    | 2                                          |
