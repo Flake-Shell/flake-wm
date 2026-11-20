@@ -24,6 +24,7 @@ enum thumbnail_type {
     THUMBNAIL_TYPE_VIEW,
     THUMBNAIL_TYPE_WORKSPACE,
     THUMBNAIL_TYPE_OUTPUT,
+    THUMBNAIL_TYPE_WORKSPACE_SCENE,
 };
 
 struct thumbnail {
@@ -109,6 +110,36 @@ struct workspace_thumbnail {
     struct wl_listener output_destroy;
 };
 
+struct workspace_scene_damage {
+    struct wl_listener listener;
+    struct workspace_scene_thumbnail *owner;
+};
+
+/**
+ * One workspace as it would look on an output, rendered from the scene even
+ * while the workspace is not the current one: the output's part of the scene
+ * with the target workspace's trees in place of the current workspace's, or
+ * only those trees for windows_only. A removed workspace renders transparent.
+ */
+struct workspace_scene_thumbnail {
+    struct thumbnail_buffer base;
+    struct wl_list link;
+    bool windows_only;
+
+    struct workspace *workspace; // NULL once removed
+    struct wl_listener workspace_destroy;
+    struct workspace_scene_damage workspace_damage[3];
+    struct wl_listener workspace_activate;
+    /* a view can join or leave while its tree hangs in another workspace */
+    struct wl_listener view_enter;
+    struct wl_listener view_leave;
+
+    struct kywc_output *output;
+    struct kywc_box output_geometry;
+    struct wl_listener output_commit;
+    struct wl_listener output_destroy;
+};
+
 struct output_thumbnail_state {
     enum wl_output_transform transform;
     /* transformed output resolution */
@@ -147,6 +178,7 @@ static struct thumbnail_manager {
     struct wl_list view_thumbnails;
     struct wl_list workspace_thumbnails;
     struct wl_list output_thumbnails;
+    struct wl_list workspace_scene_thumbnails;
 
     struct wl_list outputs;
     struct wl_listener new_enabled_output;
@@ -157,6 +189,23 @@ static struct thumbnail_manager {
 
 static void workspace_thumbnail_create_entry(struct workspace_thumbnail *workspace_thumbnail,
                                              struct kywc_output *kywc_output, struct view *view);
+
+/* disabled workspace trees only report damage while some thumbnail wants it */
+static void workspace_update_force_damage(struct workspace *workspace)
+{
+    bool force = false;
+    struct workspace_thumbnail *workspace_thumbnail;
+    wl_list_for_each(workspace_thumbnail, &manager->workspace_thumbnails, link) {
+        force |= workspace_thumbnail->workspace == workspace;
+    }
+    struct workspace_scene_thumbnail *scene_thumbnail;
+    wl_list_for_each(scene_thumbnail, &manager->workspace_scene_thumbnails, link) {
+        force |= scene_thumbnail->workspace == workspace;
+    }
+    for (int i = 0; i < 3; i++) {
+        ky_scene_node_force_damage_event(&workspace->layers[i].tree->node, force);
+    }
+}
 
 static void workspace_thumbnail_entry_create_thumbnail(struct workspace_thumbnail_entry *entry);
 
@@ -681,15 +730,11 @@ static void workspace_thumbnail_destroy(struct thumbnail_buffer *thumbnail_buffe
         workspace_thumbnail_entry_destroy(entry);
     }
 
-    struct workspace *workspace = workspace_thumbnail->workspace;
-    for (int i = 0; i < 3; i++) {
-        ky_scene_node_force_damage_event(&workspace->layers[i].tree->node, false);
-    }
-
     wl_list_remove(&workspace_thumbnail->view_enter.link);
     wl_list_remove(&workspace_thumbnail->output_destroy.link);
     wl_list_remove(&workspace_thumbnail->workspace_destroy.link);
     wl_list_remove(&workspace_thumbnail->link);
+    workspace_update_force_damage(workspace_thumbnail->workspace);
 
     free(workspace_thumbnail);
 }
@@ -900,10 +945,6 @@ workspace_thumbnail_get_or_create(struct workspace *workspace, struct kywc_outpu
         workspace_thumbnail->options |= THUMBNAIL_ENABLE_SINGLE_PLANE;
     }
 
-    for (int i = 0; i < 3; i++) {
-        ky_scene_node_force_damage_event(&workspace->layers[i].tree->node, true);
-    }
-
     workspace_thumbnail_create_entries(workspace_thumbnail, kywc_output, scale);
 
     struct output *output = output_from_kywc_output(kywc_output);
@@ -918,6 +959,7 @@ workspace_thumbnail_get_or_create(struct workspace *workspace, struct kywc_outpu
     wl_signal_add(&workspace->events.destroy, &workspace_thumbnail->workspace_destroy);
 
     wl_list_insert(&manager->workspace_thumbnails, &workspace_thumbnail->link);
+    workspace_update_force_damage(workspace);
 
     return workspace_thumbnail;
 }
@@ -1146,6 +1188,399 @@ output_thumbnail_get_or_create(struct ky_scene_output *output,
     return output_thumbnail;
 }
 
+struct workspace_scene_walk {
+    struct workspace *workspace;
+    bool windows_only;
+    /* LAYER_BELOW, LAYER_NORMAL and LAYER_ABOVE, holding a tree per workspace */
+    struct ky_scene_node *workspace_parents[3];
+    /* LAYER_ACTIVE, where an active fullscreen view is raised to */
+    struct ky_scene_node *active;
+    struct ky_scene_render_target *target;
+};
+
+static bool view_in_workspace(struct view *view, struct workspace *workspace)
+{
+    struct view_proxy *proxy;
+    wl_list_for_each(proxy, &view->view_proxies, view_link) {
+        if (proxy->workspace == workspace) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* whether node is an ancestor of the trees the walk must look into */
+static bool workspace_scene_walk_descends(struct workspace_scene_walk *walk,
+                                          struct ky_scene_node *node)
+{
+    struct ky_scene_node *keys[] = { walk->workspace_parents[0], walk->workspace_parents[1],
+                                     walk->workspace_parents[2], walk->active };
+    for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
+        for (struct ky_scene_node *tmp = keys[i]; tmp;
+             tmp = tmp->parent ? &tmp->parent->node : NULL) {
+            if (tmp == node) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/* the target workspace's own tree for one layer, rendered even if disabled */
+static void workspace_scene_render_layer(struct workspace_scene_walk *walk,
+                                         struct ky_scene_tree *tree, int lx, int ly)
+{
+    struct ky_scene_node *child;
+    wl_list_for_each(child, &tree->children, link) {
+        struct view_proxy *proxy, *found = NULL;
+        wl_list_for_each(proxy, &walk->workspace->view_proxies, workspace_link) {
+            if (&proxy->tree->node == child) {
+                found = proxy;
+                break;
+            }
+        }
+
+        /**
+         * A view in several workspaces hangs below the proxy of the current
+         * one only, draw it here as well. Unless it is raised to LAYER_ACTIVE,
+         * then it is drawn there.
+         */
+        struct view *view = found ? found->view : NULL;
+        if (view && view->current_proxy != found &&
+            view->tree->node.parent != ky_scene_tree_from_node(walk->active)) {
+            struct ky_scene_node *view_node = &view->tree->node;
+            view_node->impl.render(view_node, lx + child->x + view_node->x,
+                                   ly + child->y + view_node->y, walk->target);
+            continue;
+        }
+        child->impl.render(child, lx + child->x, ly + child->y, walk->target);
+    }
+}
+
+static void workspace_scene_walk_node(struct workspace_scene_walk *walk, struct ky_scene_node *node,
+                                      int lx, int ly)
+{
+    for (int i = 0; i < 3; i++) {
+        if (node != walk->workspace_parents[i]) {
+            continue;
+        }
+        if (!node->enabled || !walk->workspace) {
+            return;
+        }
+        struct ky_scene_node *child;
+        wl_list_for_each(child, &ky_scene_tree_from_node(node)->children, link) {
+            if (child == &walk->workspace->layers[i].tree->node) {
+                workspace_scene_render_layer(walk, walk->workspace->layers[i].tree,
+                                             lx + child->x, ly + child->y);
+            } else if (child->role.type != KY_SCENE_ROLE_WORKSPACE && !walk->windows_only) {
+                child->impl.render(child, lx + child->x, ly + child->y, walk->target);
+            }
+        }
+        return;
+    }
+
+    if (node == walk->active) {
+        if (!node->enabled || !walk->workspace) {
+            return;
+        }
+        struct ky_scene_node *child;
+        wl_list_for_each(child, &ky_scene_tree_from_node(node)->children, link) {
+            bool wanted = child->role.type == KY_SCENE_ROLE_VIEW
+                              ? view_in_workspace(child->role.data, walk->workspace)
+                              : !walk->windows_only && walk->workspace->activated;
+            if (wanted) {
+                child->impl.render(child, lx + child->x, ly + child->y, walk->target);
+            }
+        }
+        return;
+    }
+
+    if (node->type == KY_SCENE_NODE_TREE && workspace_scene_walk_descends(walk, node)) {
+        if (!node->enabled) {
+            return;
+        }
+        struct ky_scene_node *child;
+        wl_list_for_each(child, &ky_scene_tree_from_node(node)->children, link) {
+            workspace_scene_walk_node(walk, child, lx + child->x, ly + child->y);
+        }
+        return;
+    }
+
+    if (!walk->windows_only) {
+        node->impl.render(node, lx, ly, walk->target);
+    }
+}
+
+static struct wlr_buffer *workspace_scene_thumbnail_render(struct thumbnail_buffer *thumbnail_buffer,
+                                                           struct ky_scene_output *frame_output)
+{
+    struct workspace_scene_thumbnail *scene_thumbnail =
+        wl_container_of(thumbnail_buffer, scene_thumbnail, base);
+    struct output *output = output_from_kywc_output(scene_thumbnail->output);
+    struct ky_scene_output *scene_output = output->scene_output;
+    struct wlr_output *wlr_output = scene_output->output;
+    scene_thumbnail->output_geometry = output->geometry;
+
+    /* upright, in the output's buffer scale */
+    float scale = wlr_output->scale;
+    int width = round(output->geometry.width * scale);
+    int height = round(output->geometry.height * scale);
+    if (width <= 0 || height <= 0) {
+        return NULL;
+    }
+
+    struct wlr_buffer *buffer =
+        thumbnail_buffer_allocate(thumbnail_buffer, width, height, wlr_output->allocator);
+    if (!buffer) {
+        return NULL;
+    }
+
+    struct wlr_render_pass *render_pass =
+        wlr_renderer_begin_buffer_pass(wlr_output->renderer, buffer, NULL);
+    if (!render_pass) {
+        wlr_buffer_drop(buffer);
+        return NULL;
+    }
+
+    wlr_render_pass_add_rect(render_pass, &(struct wlr_render_rect_options){
+                                              .color = { 0, 0, 0, 0 },
+                                              .blend_mode = WLR_RENDER_BLEND_MODE_NONE,
+                                          });
+
+    struct ky_scene_render_target target = {
+        .logical = { output->geometry.x, output->geometry.y, output->geometry.width,
+                     output->geometry.height },
+        .scale = scale,
+        .buffer = buffer,
+        .transform = WL_OUTPUT_TRANSFORM_NORMAL,
+        .trans_width = width,
+        .trans_height = height,
+        .output = scene_output,
+        .render_pass = render_pass,
+        .options = KY_SCENE_RENDER_DISABLE_VISIBILITY | KY_SCENE_RENDER_ENABLE_SECURITY,
+    };
+    if (scene_thumbnail->windows_only) {
+        /* nothing below the windows to blur */
+        target.options |= KY_SCENE_RENDER_DISABLE_BLUR;
+    }
+    ky_scene_render_target_begin_sync(&target);
+    pixman_region32_init_rect(&target.damage, target.logical.x, target.logical.y,
+                              target.logical.width, target.logical.height);
+
+    struct workspace_scene_walk walk = {
+        .workspace = scene_thumbnail->workspace,
+        .windows_only = scene_thumbnail->windows_only,
+        .workspace_parents = {
+            &view_manager_get_layer(LAYER_BELOW, false)->tree->node,
+            &view_manager_get_layer(LAYER_NORMAL, false)->tree->node,
+            &view_manager_get_layer(LAYER_ABOVE, false)->tree->node,
+        },
+        .active = &view_manager_get_layer(LAYER_ACTIVE, false)->tree->node,
+        .target = &target,
+    };
+    /* a removed workspace yields a transparent image */
+    if (walk.workspace) {
+        struct ky_scene_node *root = &scene_output->scene->tree.node;
+        workspace_scene_walk_node(&walk, root, root->x, root->y);
+    }
+
+    bool submitted = ky_scene_render_target_submit(&target, 0);
+    pixman_region32_fini(&target.damage);
+    if (!submitted || target.sync_failed) {
+        wlr_buffer_drop(buffer);
+        return NULL;
+    }
+    return buffer;
+}
+
+static void workspace_scene_thumbnail_detach_workspace(
+    struct workspace_scene_thumbnail *scene_thumbnail)
+{
+    struct workspace *workspace = scene_thumbnail->workspace;
+    if (!workspace) {
+        return;
+    }
+    scene_thumbnail->workspace = NULL;
+    wl_list_remove(&scene_thumbnail->workspace_destroy.link);
+    wl_list_remove(&scene_thumbnail->workspace_activate.link);
+    wl_list_remove(&scene_thumbnail->view_enter.link);
+    wl_list_remove(&scene_thumbnail->view_leave.link);
+    for (int i = 0; i < 3; i++) {
+        wl_list_remove(&scene_thumbnail->workspace_damage[i].listener.link);
+    }
+    workspace_update_force_damage(workspace);
+}
+
+static void workspace_scene_thumbnail_destroy(struct thumbnail_buffer *thumbnail_buffer)
+{
+    if (!thumbnail_buffer_destroy(thumbnail_buffer)) {
+        return;
+    }
+
+    struct workspace_scene_thumbnail *scene_thumbnail =
+        wl_container_of(thumbnail_buffer, scene_thumbnail, base);
+    wl_list_remove(&scene_thumbnail->link);
+    workspace_scene_thumbnail_detach_workspace(scene_thumbnail);
+    wl_list_remove(&scene_thumbnail->output_commit.link);
+    wl_list_remove(&scene_thumbnail->output_destroy.link);
+    free(scene_thumbnail);
+}
+
+static void workspace_scene_thumbnail_damage(struct workspace_scene_thumbnail *scene_thumbnail)
+{
+    scene_thumbnail->base.was_damaged = true;
+    thumbnail_manager_schedule_frame();
+}
+
+static void workspace_scene_thumbnail_handle_workspace_damage(struct wl_listener *listener,
+                                                              void *data)
+{
+    struct workspace_scene_damage *damage = wl_container_of(listener, damage, listener);
+    workspace_scene_thumbnail_damage(damage->owner);
+}
+
+static void workspace_scene_thumbnail_handle_workspace_activate(struct wl_listener *listener,
+                                                                void *data)
+{
+    struct workspace_scene_thumbnail *scene_thumbnail =
+        wl_container_of(listener, scene_thumbnail, workspace_activate);
+    workspace_scene_thumbnail_damage(scene_thumbnail);
+}
+
+static void workspace_scene_thumbnail_handle_view_enter(struct wl_listener *listener, void *data)
+{
+    struct workspace_scene_thumbnail *scene_thumbnail =
+        wl_container_of(listener, scene_thumbnail, view_enter);
+    workspace_scene_thumbnail_damage(scene_thumbnail);
+}
+
+static void workspace_scene_thumbnail_handle_view_leave(struct wl_listener *listener, void *data)
+{
+    struct workspace_scene_thumbnail *scene_thumbnail =
+        wl_container_of(listener, scene_thumbnail, view_leave);
+    workspace_scene_thumbnail_damage(scene_thumbnail);
+}
+
+static void workspace_scene_thumbnail_handle_workspace_destroy(struct wl_listener *listener,
+                                                               void *data)
+{
+    struct workspace_scene_thumbnail *scene_thumbnail =
+        wl_container_of(listener, scene_thumbnail, workspace_destroy);
+    workspace_scene_thumbnail_detach_workspace(scene_thumbnail);
+    workspace_scene_thumbnail_damage(scene_thumbnail);
+}
+
+static void workspace_scene_thumbnail_handle_output_commit(struct wl_listener *listener, void *data)
+{
+    struct workspace_scene_thumbnail *scene_thumbnail =
+        wl_container_of(listener, scene_thumbnail, output_commit);
+    struct wlr_output_event_commit *event = data;
+
+    /* what is shown on the output: desktop, panels and views in several workspaces */
+    if (event->state->committed & (WLR_OUTPUT_STATE_MODE | WLR_OUTPUT_STATE_SCALE |
+                                   WLR_OUTPUT_STATE_TRANSFORM) ||
+        (event->state->committed & WLR_OUTPUT_STATE_DAMAGE &&
+         pixman_region32_not_empty(&event->state->damage))) {
+        workspace_scene_thumbnail_damage(scene_thumbnail);
+    }
+}
+
+static void workspace_scene_thumbnail_handle_output_destroy(struct wl_listener *listener,
+                                                            void *data)
+{
+    struct workspace_scene_thumbnail *scene_thumbnail =
+        wl_container_of(listener, scene_thumbnail, output_destroy);
+    scene_thumbnail->base.need_destroy = true;
+    workspace_scene_thumbnail_destroy(&scene_thumbnail->base);
+}
+
+static struct workspace_scene_thumbnail *
+workspace_scene_thumbnail_get_or_create(struct workspace *workspace, struct kywc_output *kywc_output,
+                                        bool windows_only)
+{
+    struct workspace_scene_thumbnail *scene_thumbnail;
+    wl_list_for_each(scene_thumbnail, &manager->workspace_scene_thumbnails, link) {
+        if (workspace && scene_thumbnail->workspace == workspace &&
+            scene_thumbnail->output == kywc_output &&
+            scene_thumbnail->windows_only == windows_only) {
+            return scene_thumbnail;
+        }
+    }
+
+    scene_thumbnail = calloc(1, sizeof(*scene_thumbnail));
+    if (!scene_thumbnail) {
+        return NULL;
+    }
+
+    thumbnail_buffer_init(&scene_thumbnail->base, 1.0f, false);
+    scene_thumbnail->base.type = THUMBNAIL_TYPE_WORKSPACE_SCENE;
+    scene_thumbnail->base.render = workspace_scene_thumbnail_render;
+    scene_thumbnail->base.destroy = workspace_scene_thumbnail_destroy;
+    scene_thumbnail->windows_only = windows_only;
+    scene_thumbnail->output = kywc_output;
+    scene_thumbnail->workspace = workspace;
+    wl_list_insert(&manager->workspace_scene_thumbnails, &scene_thumbnail->link);
+
+    if (workspace) {
+        scene_thumbnail->workspace_destroy.notify =
+            workspace_scene_thumbnail_handle_workspace_destroy;
+        wl_signal_add(&workspace->events.destroy, &scene_thumbnail->workspace_destroy);
+        scene_thumbnail->workspace_activate.notify =
+            workspace_scene_thumbnail_handle_workspace_activate;
+        wl_signal_add(&workspace->events.activate, &scene_thumbnail->workspace_activate);
+        scene_thumbnail->view_enter.notify = workspace_scene_thumbnail_handle_view_enter;
+        wl_signal_add(&workspace->events.view_enter, &scene_thumbnail->view_enter);
+        scene_thumbnail->view_leave.notify = workspace_scene_thumbnail_handle_view_leave;
+        wl_signal_add(&workspace->events.view_leave, &scene_thumbnail->view_leave);
+        for (int i = 0; i < 3; i++) {
+            scene_thumbnail->workspace_damage[i].owner = scene_thumbnail;
+            scene_thumbnail->workspace_damage[i].listener.notify =
+                workspace_scene_thumbnail_handle_workspace_damage;
+            wl_signal_add(&workspace->layers[i].tree->node.events.damage,
+                          &scene_thumbnail->workspace_damage[i].listener);
+        }
+        workspace_update_force_damage(workspace);
+    }
+
+    struct output *output = output_from_kywc_output(kywc_output);
+    scene_thumbnail->output_commit.notify = workspace_scene_thumbnail_handle_output_commit;
+    wl_signal_add(&output->wlr_output->events.commit, &scene_thumbnail->output_commit);
+    scene_thumbnail->output_destroy.notify = workspace_scene_thumbnail_handle_output_destroy;
+    wl_signal_add(&output->scene_output->events.destroy, &scene_thumbnail->output_destroy);
+
+    return scene_thumbnail;
+}
+
+struct thumbnail *thumbnail_create_from_workspace_scene(struct workspace *workspace,
+                                                        struct kywc_output *kywc_output,
+                                                        bool windows_only)
+{
+    if (!manager || !kywc_output) {
+        return NULL;
+    }
+
+    struct thumbnail *thumbnail = calloc(1, sizeof(*thumbnail));
+    if (!thumbnail) {
+        return NULL;
+    }
+
+    struct workspace_scene_thumbnail *scene_thumbnail =
+        workspace_scene_thumbnail_get_or_create(workspace, kywc_output, windows_only);
+    if (!scene_thumbnail) {
+        free(thumbnail);
+        return NULL;
+    }
+
+    thumbnail->buffer = &scene_thumbnail->base;
+    wl_list_insert(&scene_thumbnail->base.thumbnails, &thumbnail->link);
+    wl_signal_init(&thumbnail->events.update);
+    wl_signal_init(&thumbnail->events.destroy);
+    thumbnail->force_update = thumbnail->wants_update = true;
+    thumbnail_manager_schedule_frame();
+
+    return thumbnail;
+}
+
 struct thumbnail *thumbnail_create_from_node(struct ky_scene_node *node, float scale)
 {
     if (!manager) {
@@ -1359,6 +1794,12 @@ bool thumbnail_get_node_offset(struct thumbnail *thumbnail, struct ky_scene_node
         *y = output_thumbnail->output_offset_y;
         output_geometry = output_thumbnail->output_geometry;
         break;
+    case THUMBNAIL_TYPE_WORKSPACE_SCENE:;
+        struct workspace_scene_thumbnail *scene_thumbnail =
+            wl_container_of(thumbnail_buffer, scene_thumbnail, base);
+        *x = *y = 0;
+        output_geometry = scene_thumbnail->output_geometry;
+        break;
     case THUMBNAIL_TYPE_NONE:
         return false;
     }
@@ -1390,7 +1831,8 @@ bool thumbnail_get_node_offset(struct thumbnail *thumbnail, struct ky_scene_node
     }
 
     if (thumbnail_buffer->type == THUMBNAIL_TYPE_WORKSPACE ||
-        thumbnail_buffer->type == THUMBNAIL_TYPE_OUTPUT) {
+        thumbnail_buffer->type == THUMBNAIL_TYPE_OUTPUT ||
+        thumbnail_buffer->type == THUMBNAIL_TYPE_WORKSPACE_SCENE) {
         int lx, ly;
         ky_scene_node_coords(node, &lx, &ly);
         *x += (lx - output_geometry.x);
@@ -1499,6 +1941,11 @@ static void thumbnail_output_handle_frame(struct wl_listener *listener, void *da
     wl_list_for_each_safe(output_thumbnail, output_tmp, &manager->output_thumbnails, link) {
         thumbnail_buffer_render(&output_thumbnail->base, output);
     }
+
+    struct workspace_scene_thumbnail *scene_thumbnail, *scene_tmp;
+    wl_list_for_each_safe(scene_thumbnail, scene_tmp, &manager->workspace_scene_thumbnails, link) {
+        thumbnail_buffer_render(&scene_thumbnail->base, output);
+    }
 }
 
 void thumbnail_update(struct thumbnail *thumbnail)
@@ -1559,6 +2006,7 @@ bool thumbnail_manager_create(struct server *server)
     wl_list_init(&manager->view_thumbnails);
     wl_list_init(&manager->workspace_thumbnails);
     wl_list_init(&manager->output_thumbnails);
+    wl_list_init(&manager->workspace_scene_thumbnails);
 
     wl_list_init(&manager->outputs);
     manager->new_enabled_output.notify = handle_new_enabled_output;

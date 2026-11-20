@@ -180,7 +180,7 @@ wayland协议支持情况
 | hyprland_ctm_control_manager_v1      |    2     | 仅对角线（各通道缩放），非对角项忽略       |
 | hyprland_surface_manager_v1          |    2     | visible region 仅接受，不裁剪              |
 | hyprland_lock_notifier_v1            |    1     |                                            |
-| hyprland_workspace_image_capture_source_manager_v1 | no | 1                                   |
+| hyprland_workspace_image_capture_source_manager_v1 | 1 | 工作区跨所有输出，按主输出截取 |
 | hyprland_input_capture_manager_v1    |    no    | 2                                          |
 
 ## gxwm

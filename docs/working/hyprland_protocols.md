@@ -38,7 +38,6 @@ global 存在、尚未用客户端实际操作过。
 
 | 全局接口 | Hyprland 版本 | 用途 |
 | :-- | :--: | :-- |
-| `hyprland_workspace_image_capture_source_manager_v1` | 1 | 以工作区为来源的 ext-image-copy-capture |
 | `hyprland_input_capture_manager_v1` | 2 | xdph InputCapture portal（Deskflow/Barrier 等） |
 
 ## 3. 缺失：其他第三方协议

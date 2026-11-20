@@ -13,6 +13,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 
 #include <wlr/types/wlr_ext_workspace_v1.h>
 #include <wlr/types/wlr_output.h>
@@ -237,6 +238,32 @@ static void handle_manager_destroy(struct wl_listener *listener, void *data)
     wl_list_remove(&manager->destroy.link);
     free(manager);
     manager = NULL;
+}
+
+struct ext_workspace_resource_head {
+    struct wl_resource *resource;
+    struct wlr_ext_workspace_handle_v1 *handle;
+};
+
+struct workspace *ext_workspace_from_resource(struct wl_resource *resource)
+{
+    if (!manager || !resource ||
+        strcmp(wl_resource_get_class(resource), "ext_workspace_handle_v1")) {
+        return NULL;
+    }
+
+    struct ext_workspace_resource_head *head = wl_resource_get_user_data(resource);
+    if (!head || head->resource != resource) {
+        return NULL;
+    }
+
+    struct ext_workspace *ext_workspace;
+    wl_list_for_each(ext_workspace, &manager->workspaces, link) {
+        if (ext_workspace->handle == head->handle) {
+            return ext_workspace->workspace;
+        }
+    }
+    return NULL;
 }
 
 bool ext_workspace_manager_create(struct server *server)
