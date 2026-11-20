@@ -210,6 +210,7 @@ void cursor_feed_button(struct cursor *cursor, uint32_t button, bool pressed, ui
     if (input_capture_handle_button(button, pressed)) {
         return;
     }
+    hotkeys_cancel_taps();
 
     if (!session_lock_is_active() && seat->pointer_grab && seat->pointer_grab->interface->button &&
         seat->pointer_grab->interface->button(seat->pointer_grab, time, button, pressed)) {
@@ -348,6 +349,7 @@ void cursor_feed_axis(struct cursor *cursor, uint32_t orientation, uint32_t sour
                                   delta_discrete)) {
         return;
     }
+    hotkeys_cancel_taps();
 
     if (!session_lock_is_active() && seat->pointer_grab && seat->pointer_grab->interface->axis &&
         seat->pointer_grab->interface->axis(seat->pointer_grab, time,

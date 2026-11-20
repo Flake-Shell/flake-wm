@@ -6,6 +6,7 @@ target_sources(flakewm PRIVATE
   cursor_shape.c
   event.c
   gesture.c
+  hotkey.c
   emergency_term.c
   hyprland_focus_grab.c
   hyprland_global_shortcuts.c
@@ -24,6 +25,7 @@ target_sources(flakewm PRIVATE
   toplevel_drag.c
   touch.c
   transient_seat.c
+  vicinae_hotkey.c
   seat.c
   selection.c
   selection_data.c

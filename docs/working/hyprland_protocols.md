@@ -42,7 +42,6 @@ global 存在、尚未用客户端实际操作过。
 
 | 全局接口 | Hyprland 版本 | 用途 |
 | :-- | :--: | :-- |
-| `vicinae_hotkey_manager_v1` | 1 | vicinae 启动器的全局热键 |
 | `xx_hotkey_manager_v1` | 1 | 实验性全局热键协议 |
 
 ## 4. 已有但版本低于 Hyprland

@@ -295,6 +295,13 @@ static void keyboard_feed_key(struct keyboard *keyboard, uint32_t key, uint32_t 
         return;
     }
 
+    bool hotkey_press = !session_lock_is_active() && !seat->keyboard_grab &&
+                        !input_action_is_grabbing();
+    if (hotkeys_handle_key(keyboard, key, pressed, time, modifiers, hotkey_press)) {
+        keyboard_repeat_stop(keyboard);
+        return;
+    }
+
     if (session_lock_is_active()) {
         bool repeat = false;
         bool handled = keyboard_handle_bindings(keyboard, key, pressed, modifiers, &repeat);
@@ -559,6 +566,7 @@ void keyboard_add_input(struct seat *seat, struct input *input)
 
 void keyboard_destroy(struct keyboard *keyboard)
 {
+    hotkeys_keyboard_destroy(keyboard);
     struct wlr_seat *wlr_seat = keyboard->seat->wlr_seat;
     struct wlr_keyboard *wlr_keyboard = keyboard->wlr_keyboard;
 

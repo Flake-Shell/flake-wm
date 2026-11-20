@@ -167,6 +167,7 @@ wayland协议支持情况
 | zwp_text_input_manager_v2  |    1     |      |
 | qt_surface_extension       |    no    | 1    |
 | gtk_shell1                 |    no    | 5    |
+| vicinae_hotkey_manager_v1  |    1     | 与合成器快捷键冲突的组合会被拒绝 |
 
 ## hyprland
 > https://github.com/hyprwm/hyprland-protocols

@@ -206,6 +206,8 @@ bool kywc_key_binding_register(struct key_binding *binding, enum key_binding_typ
         binding->data = data;
     }
 
+    /* client hotkeys give way to compositor shortcuts */
+    hotkeys_revoke_conflicting();
     return true;
 }
 
@@ -225,6 +227,9 @@ bool kywc_key_binding_update(struct key_binding *binding, unsigned int keysym,
         binding->desc = strdup(desc);
     }
 
+    if (kywc_key_binding_is_registered(binding)) {
+        hotkeys_revoke_conflicting();
+    }
     return true;
 }
 

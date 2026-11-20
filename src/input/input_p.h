@@ -137,6 +137,49 @@ bool focus_grab_handle_button(struct seat *seat, uint32_t button, bool pressed);
 /* true if the touch down is swallowed: a touch outside the grab ends it */
 bool focus_grab_handle_touch_down(struct seat *seat, struct wlr_surface *surface);
 
+/* client-managed global hotkeys, see hotkey.c */
+enum hotkey_deny {
+    HOTKEY_DENY_NONE = -1,
+    HOTKEY_DENY_ALREADY_BOUND,
+    HOTKEY_DENY_NOT_PERMITTED,
+    HOTKEY_DENY_INVALID,
+};
+
+struct hotkey;
+
+struct hotkey_impl {
+    void (*pressed)(struct hotkey *hotkey, uint32_t serial, uint32_t time, void *data);
+    void (*released)(struct hotkey *hotkey, uint32_t serial, uint32_t time, void *data);
+    /* a compositor shortcut took the combination */
+    void (*revoked)(struct hotkey *hotkey, const char *message, void *data);
+};
+
+struct hotkey *hotkey_create(const struct hotkey_impl *impl, void *data, struct wl_client *client);
+
+void hotkey_destroy(struct hotkey *hotkey);
+
+/* modifiers are WLR_MODIFIER_*, message is set to an explanation for the client */
+enum hotkey_deny hotkey_bind_key(struct hotkey *hotkey, xkb_keysym_t keysym, uint32_t modifiers,
+                                 const char **message);
+
+/* true if the key event was a hotkey and must not reach the clients */
+bool hotkeys_handle_key(struct keyboard *keyboard, uint32_t key, bool pressed, uint32_t time,
+                        uint32_t modifiers, bool allow_press);
+
+/* a button or scroll ends a pending modifier tap */
+void hotkeys_cancel_taps(void);
+
+void hotkeys_keyboard_destroy(struct keyboard *keyboard);
+
+/* a compositor shortcut was added or changed */
+void hotkeys_revoke_conflicting(void);
+
+/* vicinae_hotkey_manager_v1, see vicinae_hotkey.c */
+bool vicinae_hotkey_manager_create(struct input_manager *input_manager);
+
+/* true while the shortcut editor waits for the next key, see action.c */
+bool input_action_is_grabbing(void);
+
 /* hyprland_input_capture_manager_v1, see hyprland_input_capture.c */
 #if HAVE_LIBEIS
 bool hyprland_input_capture_manager_create(struct input_manager *input_manager);

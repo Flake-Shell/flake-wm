@@ -229,6 +229,11 @@ static char *build_key_combo(uint32_t modifiers, xkb_keysym_t keysym)
 }
 
 /* returns true when the key was consumed by the active grab */
+bool input_action_is_grabbing(void)
+{
+    return grab_next_key;
+}
+
 bool input_action_handle_key(bool pressed, uint32_t modifiers, xkb_keysym_t keysym)
 {
     if (!grab_next_key) {
