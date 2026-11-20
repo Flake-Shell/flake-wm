@@ -177,6 +177,7 @@ static const char *const privileged_interfaces[] = {
     "zwlr_output_manager_v1",
     "zwlr_output_power_manager_v1",
     "zwlr_gamma_control_manager_v1",
+    "hyprland_ctm_control_manager_v1",
     "wp_drm_lease_device_v1",
     "kde_output_device_v2",
     "kde_output_management_v2",

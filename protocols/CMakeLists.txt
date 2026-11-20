@@ -32,6 +32,7 @@ set(protocols
   ext-background-effect-v1 ${WL_PROTOCOL_DIR}/staging/ext-background-effect/ext-background-effect-v1.xml
   hyprland-global-shortcuts-v1 hyprland-global-shortcuts-v1.xml
   hyprland-focus-grab-v1 hyprland-focus-grab-v1.xml
+  hyprland-ctm-control-v1 hyprland-ctm-control-v1.xml
   # referenced by the hyprland toplevel protocols, wlroots keeps its copy private
   zwlr-foreign-toplevel-management-v1 ${PROJECT_SOURCE_DIR}/libs/wlroots/protocol/wlr-foreign-toplevel-management-unstable-v1.xml
   hyprland-toplevel-export-v1 hyprland-toplevel-export-v1.xml

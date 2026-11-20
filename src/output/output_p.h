@@ -53,8 +53,8 @@ void output_write_config(struct output *output);
 
 struct wlr_output_state;
 bool output_set_gamma_lut(struct wlr_output *wlr_output, size_t gamma_size,
-                          struct wlr_output_state *wlr_state, const float *gamma,
-                          uint32_t color_temp, uint32_t brightness);
+                          struct wlr_output_state *wlr_state, const float *ctm,
+                          const float *gamma, uint32_t color_temp, uint32_t brightness);
 
 #define OUTPUT_GAMMA_MIN 0.1
 #define OUTPUT_GAMMA_MAX 10.0
@@ -62,6 +62,12 @@ bool output_set_gamma_lut(struct wlr_output *wlr_output, size_t gamma_size,
 bool output_gamma_is_valid(double value);
 
 bool output_set_gamma(struct output *output, const float gamma[3]);
+
+/* per-channel scale applied before the gamma ramp, see hyprland_ctm_control.c */
+void output_set_ctm(struct output *output, const float ctm[3]);
+
+/* hyprland_ctm_control_manager_v1 */
+bool hyprland_ctm_control_create(struct server *server);
 
 bool output_gamma_dbus_init(struct output_manager *output_manager);
 

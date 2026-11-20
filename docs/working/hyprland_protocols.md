@@ -38,7 +38,6 @@ global 存在、尚未用客户端实际操作过。
 
 | 全局接口 | Hyprland 版本 | 用途 |
 | :-- | :--: | :-- |
-| `hyprland_ctm_control_manager_v1` | 2 | 输出颜色变换矩阵（hyprsunset） |
 | `hyprland_surface_manager_v1` | 2 | 每 surface 不透明度 / 可见区域 |
 | `hyprland_lock_notifier_v1` | 1 | 会话锁定/解锁通知（hypridle） |
 | `hyprland_workspace_image_capture_source_manager_v1` | 1 | 以工作区为来源的 ext-image-copy-capture |

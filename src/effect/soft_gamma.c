@@ -46,9 +46,9 @@ static bool frame_render_post(struct effect_entity *entity, struct ky_scene_rend
     uint32_t color_temp = output_effective_color_temp(output);
     float color_rgb[3];
     colortemp_get_rgb(color_rgb, color_temp);
-    color_rgb[0] *= brightness * 0.01f;
-    color_rgb[1] *= brightness * 0.01f;
-    color_rgb[2] *= brightness * 0.01f;
+    color_rgb[0] *= brightness * 0.01f * output->ctm[0];
+    color_rgb[1] *= brightness * 0.01f * output->ctm[1];
+    color_rgb[2] *= brightness * 0.01f * output->ctm[2];
 
     pixman_region32_t damage;
     pixman_region32_init(&damage);
@@ -106,9 +106,9 @@ static void redraw_hardware_cursor(struct output_cursor_buffer *cursor_buffer)
     uint32_t color_temp = output_effective_color_temp(cursor_buffer->output);
     float color_rgb[3];
     colortemp_get_rgb(color_rgb, color_temp);
-    color_rgb[0] *= brightness * 0.01f;
-    color_rgb[1] *= brightness * 0.01f;
-    color_rgb[2] *= brightness * 0.01f;
+    color_rgb[0] *= brightness * 0.01f * cursor_buffer->output->ctm[0];
+    color_rgb[1] *= brightness * 0.01f * cursor_buffer->output->ctm[1];
+    color_rgb[2] *= brightness * 0.01f * cursor_buffer->output->ctm[2];
 
     wlr_render_pass_add_rect(
         render_pass,
