@@ -196,6 +196,8 @@ static bool foreign_toplevel_create(struct wlr_foreign *foreign)
     if (!foreign->toplevel_handle) {
         return false;
     }
+    /* see view_from_wlr_foreign_toplevel_resource */
+    foreign->toplevel_handle->data = foreign;
 
     foreign->request_maximize.notify = handle_request_maximize;
     foreign->request_minimize.notify = handle_request_minimize;
@@ -279,6 +281,16 @@ static void handle_destroy(struct wl_listener *listener, void *data)
     wl_list_remove(&manager->destroy.link);
     wl_list_remove(&manager->new_mapped_view.link);
     free(manager);
+}
+
+struct view *view_from_wlr_foreign_toplevel_resource(struct wl_resource *resource)
+{
+    struct wlr_foreign_toplevel_handle_v1 *handle = wl_resource_get_user_data(resource);
+    if (!handle || !handle->data) {
+        return NULL;
+    }
+    struct wlr_foreign *foreign = handle->data;
+    return view_from_kywc_view(foreign->toplevel_view);
 }
 
 bool wlr_foreign_toplevel_manager_create(struct server *server)

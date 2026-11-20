@@ -233,6 +233,22 @@ struct view *view_from_kywc_view(struct kywc_view *kywc_view);
 
 struct view *view_try_from_wlr_surface(struct wlr_surface *wlr_surface);
 
+uint32_t view_get_hyprland_handle(struct view *view);
+
+struct view *view_from_hyprland_handle(uint32_t handle);
+
+struct wl_resource;
+
+#if HAVE_WLR_FOREIGN_TOPLEVEL
+struct view *view_from_wlr_foreign_toplevel_resource(struct wl_resource *resource);
+#else
+static __attribute__((unused)) inline struct view *
+view_from_wlr_foreign_toplevel_resource(struct wl_resource *resource)
+{
+    return NULL;
+}
+#endif
+
 void view_init(struct view *view, const struct view_impl *impl, void *data);
 
 void view_map(struct view *view);

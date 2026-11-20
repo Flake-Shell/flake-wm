@@ -792,6 +792,7 @@ bool effect_manager_create(struct server *server)
     treeland_capture_manager_create(server);
     ext_image_copy_capture_manager_create(server);
     gxde_screenshot_manager_create(server);
+    hyprland_toplevel_export_manager_create(server);
 
     manager->server = server;
     manager->server_destroy.notify = handle_server_destroy;

@@ -1036,6 +1036,22 @@ struct kywc_view *kywc_view_by_uuid(const char *uuid)
     return NULL;
 }
 
+uint32_t view_get_hyprland_handle(struct view *view)
+{
+    return (uint32_t)(uintptr_t)view;
+}
+
+struct view *view_from_hyprland_handle(uint32_t handle)
+{
+    struct view *view;
+    wl_list_for_each(view, &view_manager->views, link) {
+        if (view->base.mapped && view_get_hyprland_handle(view) == handle) {
+            return view;
+        }
+    }
+    return NULL;
+}
+
 struct view *view_from_kywc_view(struct kywc_view *kywc_view)
 {
     struct view *view = wl_container_of(kywc_view, view, base);
