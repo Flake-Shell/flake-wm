@@ -90,6 +90,177 @@ void cursor_set_xcursor_manager(struct cursor *cursor, const char *theme, uint32
 void cursor_set_surface(struct cursor *cursor, struct wlr_surface *surface, int32_t hotspot_x,
                         int32_t hotspot_y, struct wl_client *client);
 
+struct wlr_seat_client;
+
+/* cursor-shape-v1: set a named cursor on behalf of a client */
+void cursor_set_client_xcursor(struct cursor *cursor, const char *name, struct wl_client *client);
+
+/* true if the client may set the pointer cursor now (has focus, no grab ...) */
+bool cursor_pointer_client_may_set_cursor(struct cursor *cursor,
+                                          struct wlr_seat_client *seat_client);
+
+/* move the cursor to a surface-local position, then update pointer focus */
+bool cursor_warp_to_surface(struct cursor *cursor, struct wlr_surface *surface, double sx,
+                            double sy);
+
+bool cursor_shape_manager_create(struct input_manager *input_manager);
+
+bool pointer_warp_manager_create(struct input_manager *input_manager);
+
+void emergency_term_binding_create(struct input_manager *input_manager);
+
+/* hyprland_global_shortcuts_manager_v1, see hyprland_global_shortcuts.c */
+bool hyprland_global_shortcuts_create(struct input_manager *input_manager);
+
+bool hyprland_global_shortcut_trigger(const char *target, bool from_key);
+
+typedef bool (*hyprland_global_shortcut_iterator_func_t)(const char *app_id, const char *id,
+                                                         const char *description,
+                                                         const char *trigger_description,
+                                                         void *data);
+
+void hyprland_global_shortcuts_for_each(hyprland_global_shortcut_iterator_func_t iterator,
+                                        void *data);
+
+/* hyprland_focus_grab_manager_v1, see hyprland_focus_grab.c */
+bool hyprland_focus_grab_manager_create(struct input_manager *input_manager);
+
+/* true while a focus grab on this seat keeps input away from the surface */
+bool focus_grab_rejects(struct seat *seat, struct wlr_surface *surface);
+
+/* end the focus grab on this seat, another grab or the lock screen took over */
+void focus_grab_cancel(struct seat *seat);
+
+/* true if the button event is swallowed: a press outside the grab ends it */
+bool focus_grab_handle_button(struct seat *seat, uint32_t button, bool pressed);
+
+/* true if the touch down is swallowed: a touch outside the grab ends it */
+bool focus_grab_handle_touch_down(struct seat *seat, struct wlr_surface *surface);
+
+/* client-managed global hotkeys, see hotkey.c */
+enum hotkey_deny {
+    HOTKEY_DENY_NONE = -1,
+    HOTKEY_DENY_ALREADY_BOUND,
+    HOTKEY_DENY_NOT_PERMITTED,
+    HOTKEY_DENY_INVALID,
+};
+
+enum hotkey_trigger {
+    HOTKEY_TRIGGER_KEY,
+    HOTKEY_TRIGGER_BUTTON,
+};
+
+struct hotkey;
+
+struct hotkey_impl {
+    void (*pressed)(struct hotkey *hotkey, uint32_t serial, uint32_t time, void *data);
+    void (*released)(struct hotkey *hotkey, uint32_t serial, uint32_t time, void *data);
+    /* a compositor shortcut took the combination */
+    void (*revoked)(struct hotkey *hotkey, const char *message, void *data);
+};
+
+struct hotkey *hotkey_create(const struct hotkey_impl *impl, void *data, struct wl_client *client);
+
+void hotkey_destroy(struct hotkey *hotkey);
+
+/* modifiers are WLR_MODIFIER_*, message is set to an explanation for the client */
+enum hotkey_deny hotkey_bind_key(struct hotkey *hotkey, xkb_keysym_t keysym, uint32_t modifiers,
+                                 const char **message);
+
+enum hotkey_deny hotkey_bind_button(struct hotkey *hotkey, uint32_t button, uint32_t modifiers,
+                                    const char **message);
+
+/* true if the key event was a hotkey and must not reach the clients */
+bool hotkeys_handle_key(struct keyboard *keyboard, uint32_t key, bool pressed, uint32_t time,
+                        uint32_t modifiers, bool allow_press);
+
+/* true if the button event was a hotkey, any button also ends a pending modifier tap */
+bool hotkeys_handle_button(struct seat *seat, uint32_t button, bool pressed, uint32_t time,
+                           bool allow_press);
+
+/* a scroll ends a pending modifier tap */
+void hotkeys_cancel_taps(void);
+
+void hotkeys_keyboard_destroy(struct keyboard *keyboard);
+
+/* a compositor shortcut was added or changed */
+void hotkeys_revoke_conflicting(void);
+
+/* vicinae_hotkey_manager_v1, see vicinae_hotkey.c */
+bool vicinae_hotkey_manager_create(struct input_manager *input_manager);
+
+/* xx_hotkey_manager_v1, see xx_hotkey.c */
+bool xx_hotkey_manager_create(struct input_manager *input_manager);
+
+/* true while the shortcut editor waits for the next key, see action.c */
+bool input_action_is_grabbing(void);
+
+/* hyprland_input_capture_manager_v1, see hyprland_input_capture.c */
+#if HAVE_LIBEIS
+bool hyprland_input_capture_manager_create(struct input_manager *input_manager);
+
+/* true while input goes to an input capture session instead of the clients */
+bool input_capture_is_active(void);
+
+/* end a capture, as on Super+Shift+Escape */
+void input_capture_force_release(void);
+
+/* each returns true if the event went to the capture session */
+bool input_capture_handle_motion(struct seat *seat, double lx, double ly, double dx, double dy);
+
+bool input_capture_handle_button(uint32_t button, bool pressed);
+
+bool input_capture_handle_axis(enum wl_pointer_axis_source source, bool vertical, double delta,
+                               int32_t delta_discrete);
+
+bool input_capture_handle_frame(void);
+
+bool input_capture_handle_key(struct keyboard *keyboard, uint32_t key, bool pressed,
+                              uint32_t modifiers);
+
+bool input_capture_handle_modifiers(void);
+#else
+static inline bool input_capture_is_active(void)
+{
+    return false;
+}
+
+static inline void input_capture_force_release(void) {}
+
+static inline bool input_capture_handle_motion(struct seat *seat, double lx, double ly, double dx,
+                                               double dy)
+{
+    return false;
+}
+
+static inline bool input_capture_handle_button(uint32_t button, bool pressed)
+{
+    return false;
+}
+
+static inline bool input_capture_handle_axis(enum wl_pointer_axis_source source, bool vertical,
+                                             double delta, int32_t delta_discrete)
+{
+    return false;
+}
+
+static inline bool input_capture_handle_frame(void)
+{
+    return false;
+}
+
+static inline bool input_capture_handle_key(struct keyboard *keyboard, uint32_t key, bool pressed,
+                                            uint32_t modifiers)
+{
+    return false;
+}
+
+static inline bool input_capture_handle_modifiers(void)
+{
+    return false;
+}
+#endif
+
 bool seat_read_config(struct seat *seat);
 
 void seat_write_config(struct seat *seat);

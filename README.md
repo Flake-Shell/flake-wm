@@ -367,7 +367,13 @@ Usage: kylin-wlcom [options] [command]
   -s, --session <process>  Run session on startup\n
   -v, --version            Show the version number and quit.\n
   -V, --verbose            Enables more verbose logging.\n
+      --no-default-keybind Register no key bindings on startup.\n
+      --emergency-term-keybind Bind Win+q to open a terminal.\n
 ```
+
+`--no-default-keybind` registers no key bindings on startup: neither the built-in shortcuts (window actions, workspace switching, Alt+Tab, multitasking view ...) nor the ones in the InputAction config. Saved actions stay listed and can be bound with `ControlAction enable`.
+
+`--emergency-term-keybind` binds Win+q to open a terminal and is not affected by `--no-default-keybind`.
 
 
 

@@ -18,6 +18,9 @@
 #include <wlr/backend/session.h>
 #include <wlr/render/allocator.h>
 #include <wlr/render/wlr_renderer.h>
+#include <wlr/types/wlr_alpha_modifier_v1.h>
+#include <wlr/types/wlr_color_management_v1.h>
+#include <wlr/types/wlr_content_type_v1.h>
 #include <wlr/types/wlr_linux_drm_syncobj_v1.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_export_dmabuf_v1.h>
@@ -25,6 +28,7 @@
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_presentation_time.h>
 #include <wlr/types/wlr_screencopy_v1.h>
+#include <wlr/types/wlr_single_pixel_buffer_v1.h>
 #include <wlr/types/wlr_subcompositor.h>
 #include <wlr/types/wlr_viewporter.h>
 #include <wlr/util/log.h>
@@ -40,6 +44,7 @@
 #include "output.h"
 #include "plugin.h"
 #include "render/renderer.h"
+#include "scene/surface.h"
 #include "security.h"
 #include "server.h"
 #include "theme.h"
@@ -144,6 +149,41 @@ static void handle_renderer_destroy(struct wl_listener *listener, void *data)
     server->renderer = NULL;
     if (!server->terminate) {
         wl_display_terminate(server->display);
+    }
+}
+
+/**
+ * The scene renders every buffer as sRGB and has no color pipeline, so only
+ * advertise what is honored: parametric gamma 2.2 with sRGB primaries and
+ * the perceptual intent. The output image description defaults to sRGB too.
+ * Clients asking for anything else (PQ, BT.2020 ...) are refused by wlroots.
+ */
+static void color_manager_create(struct server *server)
+{
+    static const enum wp_color_manager_v1_render_intent render_intents[] = {
+        WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL,
+    };
+    static const enum wp_color_manager_v1_transfer_function transfer_functions[] = {
+        /* the "srgb" named TF is deprecated, wlroots asserts it is not listed */
+        WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_GAMMA22,
+    };
+    static const enum wp_color_manager_v1_primaries primaries[] = {
+        WP_COLOR_MANAGER_V1_PRIMARIES_SRGB,
+    };
+    const struct wlr_color_manager_v1_options options = {
+        .features = {
+            .parametric = true,
+        },
+        .render_intents = render_intents,
+        .render_intents_len = sizeof(render_intents) / sizeof(render_intents[0]),
+        .transfer_functions = transfer_functions,
+        .transfer_functions_len = sizeof(transfer_functions) / sizeof(transfer_functions[0]),
+        .primaries = primaries,
+        .primaries_len = sizeof(primaries) / sizeof(primaries[0]),
+    };
+
+    if (!wlr_color_manager_v1_create(server->display, 2, &options)) {
+        kywc_log(KYWC_WARN, "unable to create color manager");
     }
 }
 
@@ -285,6 +325,19 @@ static bool wlroots_server_init(struct server *server)
     wlr_export_dmabuf_manager_v1_create(server->display);
     wlr_viewporter_create(server->display);
     wlr_fractional_scale_manager_v1_create(server->display, 1);
+
+    /* wl_buffers of a single solid color, sampled through the data_ptr texture path */
+    wlr_single_pixel_buffer_manager_v1_create(server->display);
+    /* content hints only, nothing consumes them yet */
+    wlr_content_type_manager_v1_create(server->display, 1);
+    /* the multiplier is applied to the scene buffer in scene/surface.c */
+    wlr_alpha_modifier_v1_create(server->display);
+    color_manager_create(server);
+
+    /* readiness constraints, see scene/fifo.c and scene/commit_timing.c */
+    fifo_manager_create(server->display);
+    commit_timing_manager_create(server->display);
+    hyprland_surface_manager_create(server->display);
 
     return true;
 }

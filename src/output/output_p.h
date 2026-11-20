@@ -53,8 +53,8 @@ void output_write_config(struct output *output);
 
 struct wlr_output_state;
 bool output_set_gamma_lut(struct wlr_output *wlr_output, size_t gamma_size,
-                          struct wlr_output_state *wlr_state, const float *gamma,
-                          uint32_t color_temp, uint32_t brightness);
+                          struct wlr_output_state *wlr_state, const float *ctm,
+                          const float *gamma, uint32_t color_temp, uint32_t brightness);
 
 #define OUTPUT_GAMMA_MIN 0.1
 #define OUTPUT_GAMMA_MAX 10.0
@@ -62,6 +62,12 @@ bool output_set_gamma_lut(struct wlr_output *wlr_output, size_t gamma_size,
 bool output_gamma_is_valid(double value);
 
 bool output_set_gamma(struct output *output, const float gamma[3]);
+
+/* per-channel scale applied before the gamma ramp, see hyprland_ctm_control.c */
+void output_set_ctm(struct output *output, const float ctm[3]);
+
+/* hyprland_ctm_control_manager_v1 */
+bool hyprland_ctm_control_create(struct server *server);
 
 bool output_gamma_dbus_init(struct output_manager *output_manager);
 
@@ -72,6 +78,12 @@ struct output *output_find_by_wlr_output(struct wlr_output *wlr_output);
 struct wlr_gamma_control_v1 *output_get_gamma_control(struct wlr_output *wlr_output);
 
 bool output_gamma_control_create(struct server *server);
+
+/* wp_drm_lease_device_v1, see drm_lease.c */
+bool output_drm_lease_create(struct server *server);
+
+/* offer a non-desktop output for lease, false if it is to be used as desktop output */
+bool output_drm_lease_offer(struct wlr_output *wlr_output);
 
 void output_set_pending_primary(struct output *output);
 

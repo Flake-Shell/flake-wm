@@ -570,6 +570,7 @@ static void buffer_render(struct ky_scene_node *node, int lx, int ly,
             .lx = lx,
             .ly = ly,
             .dst_box = &dst_box,
+            .alpha = scene_buffer->blur_opacity != 1 ? &scene_buffer->blur_opacity : NULL,
             .clip = &render_region,
             .radius = &options.radius,
             .blur = node->has_blur ? &node->blur : NULL,
@@ -642,6 +643,7 @@ void ky_scene_buffer_init(struct ky_scene_buffer *scene_buffer, struct ky_scene_
 {
     *scene_buffer = (struct ky_scene_buffer){
         .opacity = 1,
+        .blur_opacity = 1,
     };
     ky_scene_node_init(&scene_buffer->node, parent);
     wl_list_init(&scene_buffer->texture_renderer_destroy.link);
@@ -860,11 +862,22 @@ void ky_scene_buffer_set_opacity(struct ky_scene_buffer *scene_buffer, float opa
         return;
     }
 
-    scene_buffer->opacity = opacity;
+    /* going to or from opaque changes what is visible below */
     bool harmful = scene_buffer->opacity == 1 || opacity == 1;
+    scene_buffer->opacity = opacity;
     /* push damage return early when has no buffer */
     ky_scene_node_push_damage(&scene_buffer->node,
                               harmful ? KY_SCENE_DAMAGE_BOTH : KY_SCENE_DAMAGE_HARMLESS, NULL);
+}
+
+void ky_scene_buffer_set_blur_opacity(struct ky_scene_buffer *scene_buffer, float opacity)
+{
+    if (scene_buffer->blur_opacity == opacity) {
+        return;
+    }
+
+    scene_buffer->blur_opacity = opacity;
+    ky_scene_node_push_damage(&scene_buffer->node, KY_SCENE_DAMAGE_HARMLESS, NULL);
 }
 
 void ky_scene_buffer_set_repeated(struct ky_scene_buffer *scene_buffer, bool repeated)

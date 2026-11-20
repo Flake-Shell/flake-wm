@@ -32,7 +32,8 @@ set(WLCOM_PLUGIN_DIRECTORY
 
 set(WLCOM_LIBUNWIND "auto" CACHE STRING "Use libunwind for stack-traces")
 set(WLCOM_NLS "auto" CACHE STRING "Enable native language support")
-set_property(CACHE WLCOM_LIBUNWIND WLCOM_NLS PROPERTY STRINGS
+set(WLCOM_LIBEIS "auto" CACHE STRING "Use libeis for the hyprland input capture protocol")
+set_property(CACHE WLCOM_LIBUNWIND WLCOM_NLS WLCOM_LIBEIS PROPERTY STRINGS
   auto enabled disabled
 )
 
@@ -211,6 +212,16 @@ if(NOT WLCOM_LIBUNWIND STREQUAL "disabled")
   set(HAVE_LIBUNWIND ${LIBUNWIND_FOUND})
 endif()
 
+set(HAVE_LIBEIS OFF)
+if(NOT WLCOM_LIBEIS STREQUAL "disabled")
+  if(WLCOM_LIBEIS STREQUAL "enabled")
+    pkg_check_modules(LIBEIS REQUIRED IMPORTED_TARGET libeis-1.0)
+  else()
+    pkg_check_modules(LIBEIS QUIET IMPORTED_TARGET libeis-1.0)
+  endif()
+  set(HAVE_LIBEIS ${LIBEIS_FOUND})
+endif()
+
 set(HAVE_NLS OFF)
 if(NOT WLCOM_NLS STREQUAL "disabled")
   if(WLCOM_NLS STREQUAL "enabled")
@@ -252,6 +263,7 @@ add_compile_definitions(
 
 wlcom_define_bool(HAVE_XWAYLAND HAVE_XWAYLAND)
 wlcom_define_bool(HAVE_LIBUNWIND HAVE_LIBUNWIND)
+wlcom_define_bool(HAVE_LIBEIS HAVE_LIBEIS)
 foreach(name IN LISTS wlcom_feature_names)
   wlcom_define_bool(HAVE_${name} WLCOM_${name})
 endforeach()
@@ -312,6 +324,7 @@ wlcom_summary_line(wlroots_renderers "${WLCOM_WLROOTS_RENDERERS}")
 wlcom_summary_line(xwayland "${HAVE_XWAYLAND}")
 wlcom_summary_line(examples "${WLCOM_EXAMPLES}")
 wlcom_summary_line(libunwind "${HAVE_LIBUNWIND}")
+wlcom_summary_line(libeis "${HAVE_LIBEIS}")
 wlcom_summary_line(nls "${HAVE_NLS}")
 wlcom_summary_line(libkywc "${WLCOM_LIBKYWC}")
 wlcom_summary_line(tracy "${WLCOM_TRACY}")

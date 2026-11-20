@@ -15,12 +15,14 @@
  * with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
 #include <drm_fourcc.h>
 #include <wlr/types/wlr_buffer.h>
+#include <wlr/types/wlr_output.h>
 
 #include <kywc/log.h>
 
@@ -33,12 +35,17 @@
 #include "ext-foreign-toplevel-list-v1-protocol.h"
 #include "ext-image-capture-source-v1-protocol.h"
 #include "ext-image-copy-capture-v1-protocol.h"
+#include "hyprland-workspace-image-capture-source-v1-protocol.h"
+#include "view/workspace.h"
 
 #define EXT_CAPTURE_VERSION 1
+#define HYPRLAND_WORKSPACE_CAPTURE_SOURCE_VERSION 1
 
 enum ext_source_kind {
     EXT_SOURCE_OUTPUT,
     EXT_SOURCE_TOPLEVEL,
+    /* hyprland_workspace_image_capture_source_manager_v1 */
+    EXT_SOURCE_WORKSPACE,
 };
 
 struct ext_capture_manager;
@@ -71,7 +78,10 @@ struct ext_capture_source {
     union {
         struct output *output;
         struct view *view;
+        /* NULL once removed, which is captured as a transparent image */
+        struct workspace *workspace;
     } target;
+    bool windows_only;
 
     union {
         struct capture *capture;
@@ -105,6 +115,7 @@ struct ext_capture_manager {
     struct server *server;
     struct wl_global *output_source_global;
     struct wl_global *toplevel_source_global;
+    struct wl_global *workspace_source_global;
     struct wl_global *copy_capture_global;
     struct wl_global *toplevel_list_global;
     struct wl_list toplevels;
@@ -276,6 +287,14 @@ static void source_handle_target_destroy(struct wl_listener *listener, void *dat
     source_stop(source);
 }
 
+static void source_handle_workspace_destroy(struct wl_listener *listener, void *data)
+{
+    struct ext_capture_source *source = wl_container_of(listener, source, target_destroy);
+    wl_list_remove(&source->target_destroy.link);
+    wl_list_init(&source->target_destroy.link);
+    source->target.workspace = NULL;
+}
+
 static void source_handle_backend_update(struct wl_listener *listener, void *data)
 {
     struct ext_capture_source *source = wl_container_of(listener, source, backend_update);
@@ -337,8 +356,14 @@ static bool source_create_backend(struct ext_capture_source *source, uint32_t op
         source->backend_destroy.notify = source_handle_backend_destroy;
         capture_add_destroy_listener(source->backend.capture, &source->backend_destroy);
     } else {
-        source->backend.thumbnail = thumbnail_create_from_view(
-            source->target.view, THUMBNAIL_DISABLE_SHADOW | THUMBNAIL_ENABLE_SECURITY, 1.0f);
+        if (source->kind == EXT_SOURCE_WORKSPACE) {
+            /* workspaces span all outputs, capture them as on the primary one */
+            source->backend.thumbnail = thumbnail_create_from_workspace_scene(
+                source->target.workspace, kywc_output_get_primary(), source->windows_only);
+        } else {
+            source->backend.thumbnail = thumbnail_create_from_view(
+                source->target.view, THUMBNAIL_DISABLE_SHADOW | THUMBNAIL_ENABLE_SECURITY, 1.0f);
+        }
         if (!source->backend.thumbnail) {
             return false;
         }
@@ -397,7 +422,21 @@ static struct ext_capture_source *source_create(struct ext_capture_manager *mana
     wl_resource_set_implementation(resource, &source_impl, source,
         source_handle_resource_destroy);
 
-    if (!target) {
+    if (kind == EXT_SOURCE_WORKSPACE) {
+        struct kywc_output *kywc_output = kywc_output_get_primary();
+        if (!kywc_output) {
+            source->stopped = true;
+            return source;
+        }
+        struct output *output = output_from_kywc_output(kywc_output);
+        source->width = round(output->geometry.width * output->wlr_output->scale);
+        source->height = round(output->geometry.height * output->wlr_output->scale);
+        if (target) {
+            struct workspace *workspace = target;
+            source->target_destroy.notify = source_handle_workspace_destroy;
+            wl_signal_add(&workspace->events.destroy, &source->target_destroy);
+        }
+    } else if (!target) {
         source->stopped = true;
     } else if (kind == EXT_SOURCE_OUTPUT) {
         struct output *output = target;
@@ -870,18 +909,22 @@ static void toplevel_list_bind(struct wl_client *client, void *data, uint32_t ve
     }
 }
 
+struct view *ext_foreign_toplevel_view_from_resource(struct wl_resource *resource)
+{
+    if (!resource || !wl_resource_instance_of(resource, &ext_foreign_toplevel_handle_v1_interface,
+                                              &toplevel_handle_impl)) {
+        return NULL;
+    }
+    struct ext_toplevel *toplevel = wl_resource_get_user_data(resource);
+    return toplevel ? toplevel->view : NULL;
+}
+
 static void toplevel_source_handle_create(struct wl_client *client, struct wl_resource *resource,
                                           uint32_t id, struct wl_resource *handle_resource)
 {
     struct ext_capture_manager *manager = wl_resource_get_user_data(resource);
-    struct ext_toplevel *toplevel = NULL;
-    if (handle_resource &&
-        wl_resource_instance_of(handle_resource, &ext_foreign_toplevel_handle_v1_interface,
-                                &toplevel_handle_impl)) {
-        toplevel = wl_resource_get_user_data(handle_resource);
-    }
     source_create(manager, client, id, EXT_SOURCE_TOPLEVEL,
-                  toplevel ? toplevel->view : NULL);
+                  ext_foreign_toplevel_view_from_resource(handle_resource));
 }
 
 static const struct ext_foreign_toplevel_image_capture_source_manager_v1_interface
@@ -900,6 +943,47 @@ static void toplevel_source_bind(struct wl_client *client, void *data, uint32_t 
         return;
     }
     wl_resource_set_implementation(resource, &toplevel_source_impl, data, NULL);
+}
+
+static void workspace_source_handle_create(struct wl_client *client, struct wl_resource *resource,
+                                           uint32_t id, struct wl_resource *workspace_resource,
+                                           uint32_t mode)
+{
+    if (mode != HYPRLAND_WORKSPACE_IMAGE_CAPTURE_SOURCE_MANAGER_V1_CAPTURE_MODE_WINDOWS_ONLY &&
+        mode != HYPRLAND_WORKSPACE_IMAGE_CAPTURE_SOURCE_MANAGER_V1_CAPTURE_MODE_EVERYTHING) {
+        wl_resource_post_error(resource,
+                               HYPRLAND_WORKSPACE_IMAGE_CAPTURE_SOURCE_MANAGER_V1_ERROR_INVALID_MODE,
+                               "invalid workspace capture mode %u", mode);
+        return;
+    }
+
+    /* an inert handle is a removed workspace: a transparent image */
+    struct ext_capture_manager *manager = wl_resource_get_user_data(resource);
+    struct ext_capture_source *source =
+        source_create(manager, client, id, EXT_SOURCE_WORKSPACE,
+                      ext_workspace_from_resource(workspace_resource));
+    if (source) {
+        source->windows_only =
+            mode == HYPRLAND_WORKSPACE_IMAGE_CAPTURE_SOURCE_MANAGER_V1_CAPTURE_MODE_WINDOWS_ONLY;
+    }
+}
+
+static const struct hyprland_workspace_image_capture_source_manager_v1_interface
+    workspace_source_impl = {
+        .create_source = workspace_source_handle_create,
+        .destroy = manager_resource_destroy,
+    };
+
+static void workspace_source_bind(struct wl_client *client, void *data, uint32_t version,
+                                  uint32_t id)
+{
+    struct wl_resource *resource = wl_resource_create(
+        client, &hyprland_workspace_image_capture_source_manager_v1_interface, version, id);
+    if (!resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+    wl_resource_set_implementation(resource, &workspace_source_impl, data, NULL);
 }
 
 static void manager_handle_display_destroy(struct wl_listener *listener, void *data)
@@ -931,6 +1015,9 @@ static void manager_handle_display_destroy(struct wl_listener *listener, void *d
     }
     wl_global_destroy(manager->output_source_global);
     wl_global_destroy(manager->toplevel_source_global);
+    if (manager->workspace_source_global) {
+        wl_global_destroy(manager->workspace_source_global);
+    }
     wl_global_destroy(manager->copy_capture_global);
     wl_global_destroy(manager->toplevel_list_global);
     free(manager);
@@ -975,6 +1062,13 @@ bool ext_image_copy_capture_manager_create(struct server *server)
         }
         free(manager);
         return false;
+    }
+
+    manager->workspace_source_global = wl_global_create(
+        server->display, &hyprland_workspace_image_capture_source_manager_v1_interface,
+        HYPRLAND_WORKSPACE_CAPTURE_SOURCE_VERSION, manager, workspace_source_bind);
+    if (!manager->workspace_source_global) {
+        kywc_log(KYWC_WARN, "failed to create hyprland workspace image capture source global");
     }
 
     manager->new_mapped_view.notify = manager_handle_new_mapped_view;

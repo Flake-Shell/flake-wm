@@ -2084,6 +2084,11 @@ bool present_windows_create(struct view_manager *view_manager)
     /* Timers and grabs must be released before display/event-loop teardown. */
     wl_signal_add(&view_manager->server->events.terminate, &pv->server_destroy);
 
+    /* without default key bindings the view is still reachable by other means */
+    if (kywc_key_binding_defaults_disabled()) {
+        return true;
+    }
+
     struct key_binding *binding =
         kywc_key_binding_create("Win+a:no", "toggle present windows (all desktops)");
     if (!binding ||

@@ -78,6 +78,8 @@ struct view_layer *workspace_layer(struct workspace *workspace, enum layer layer
 
 struct workspace *workspace_by_position(uint32_t position);
 
+struct workspace *ext_workspace_from_resource(struct wl_resource *resource);
+
 struct workspace *workspace_by_uuid(const char *uuid);
 
 void workspace_set_position(struct workspace *workspace, uint32_t position);

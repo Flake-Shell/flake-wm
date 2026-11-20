@@ -26,6 +26,23 @@ set(protocols
   ext-transient-seat-v1 ${WL_PROTOCOL_DIR}/staging/ext-transient-seat/ext-transient-seat-v1.xml
   xdg-toplevel-drag-manager-v1 ${WL_PROTOCOL_DIR}/staging/xdg-toplevel-drag/xdg-toplevel-drag-v1.xml
   wptearing-contorl-v1 ${WL_PROTOCOL_DIR}/staging/tearing-control/tearing-control-v1.xml
+  wp-fifo-v1 ${WL_PROTOCOL_DIR}/staging/fifo/fifo-v1.xml
+  wp-commit-timing-v1 ${WL_PROTOCOL_DIR}/staging/commit-timing/commit-timing-v1.xml
+  wp-pointer-warp-v1 ${WL_PROTOCOL_DIR}/staging/pointer-warp/pointer-warp-v1.xml
+  ext-background-effect-v1 ${WL_PROTOCOL_DIR}/staging/ext-background-effect/ext-background-effect-v1.xml
+  hyprland-global-shortcuts-v1 hyprland-global-shortcuts-v1.xml
+  hyprland-focus-grab-v1 hyprland-focus-grab-v1.xml
+  hyprland-ctm-control-v1 hyprland-ctm-control-v1.xml
+  hyprland-surface-v1 hyprland-surface-v1.xml
+  hyprland-lock-notify-v1 hyprland-lock-notify-v1.xml
+  hyprland-workspace-image-capture-source-v1 hyprland-workspace-image-capture-source-v1.xml
+  hyprland-input-capture-v1 hyprland-input-capture-v1.xml
+  vicinae-hotkey-v1 vicinae-hotkey-v1.xml
+  xx-hotkey-v1 xx-hotkey-v1.xml
+  # referenced by the hyprland toplevel protocols, wlroots keeps its copy private
+  zwlr-foreign-toplevel-management-v1 ${PROJECT_SOURCE_DIR}/libs/wlroots/protocol/wlr-foreign-toplevel-management-unstable-v1.xml
+  hyprland-toplevel-export-v1 hyprland-toplevel-export-v1.xml
+  hyprland-toplevel-mapping-v1 hyprland-toplevel-mapping-v1.xml
 )
 
 list(APPEND protocols

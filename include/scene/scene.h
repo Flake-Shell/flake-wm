@@ -262,6 +262,8 @@ struct ky_scene_buffer {
 
     bool repeated;
     float opacity;
+    /* multiplier on the blur behind the buffer, from hyprland_surface_v1 */
+    float blur_opacity;
     pixman_region32_t opaque_region;
     float border_width;
     float border_color[4];
@@ -440,6 +442,8 @@ void ky_scene_buffer_set_buffer_with_damage(struct ky_scene_buffer *scene_buffer
                                             const pixman_region32_t *region);
 
 void ky_scene_buffer_set_opacity(struct ky_scene_buffer *scene_buffer, float opacity);
+
+void ky_scene_buffer_set_blur_opacity(struct ky_scene_buffer *scene_buffer, float opacity);
 
 void ky_scene_buffer_set_opaque_region(struct ky_scene_buffer *scene_buffer,
                                        const pixman_region32_t *region);

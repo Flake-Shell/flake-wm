@@ -7,7 +7,10 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
+
+#include <wlr/types/wlr_security_context_v1.h>
 
 #include <kywc/log.h>
 
@@ -22,6 +25,8 @@ struct security_global_filter {
 };
 
 struct security_manager {
+    /* wp_security_context_v1, tags clients spawned by sandbox engines */
+    struct wlr_security_context_manager_v1 *security_context;
     struct wl_list clients;
     struct wl_listener new_client;
     struct wl_list global_filters;
@@ -129,10 +134,94 @@ static struct security_global_filter *global_filter_from_global(const struct wl_
     return NULL;
 }
 
+/**
+ * Globals a sandboxed client (connected through wp_security_context_v1, e.g. a
+ * flatpak app) must not see: they read other clients' content or input, inject
+ * input, or control outputs, windows and the desktop shell.
+ */
+static const char *const privileged_interfaces[] = {
+    /* screen and window capture */
+    "zwlr_screencopy_manager_v1",
+    "zwlr_export_dmabuf_manager_v1",
+    "ext_image_copy_capture_manager_v1",
+    "hyprland_toplevel_export_manager_v1",
+    "ext_output_image_capture_source_manager_v1",
+    "ext_foreign_toplevel_image_capture_source_manager_v1",
+    "hyprland_workspace_image_capture_source_manager_v1",
+    "gxde_screenshot_manager_v1",
+    "kywc_capture_manager_v1",
+    "treeland_capture_manager_v1",
+    /* clipboard of other clients */
+    "zwlr_data_control_manager_v1",
+    "ext_data_control_manager_v1",
+    /* input injection and grabs */
+    "zwp_virtual_keyboard_manager_v1",
+    "zwlr_virtual_pointer_manager_v1",
+    "zwp_input_method_manager_v2",
+    "zwp_keyboard_shortcuts_inhibit_manager_v1",
+    "hyprland_focus_grab_manager_v1",
+    "hyprland_input_capture_manager_v1",
+    "vicinae_hotkey_manager_v1",
+    "xx_hotkey_manager_v1",
+    "ext_transient_seat_manager_v1",
+    "org_kde_kwin_keystate",
+    /* sandboxed apps use the GlobalShortcuts portal instead */
+    "hyprland_global_shortcuts_manager_v1",
+    /* window and workspace management */
+    "zwlr_foreign_toplevel_manager_v1",
+    "ext_foreign_toplevel_list_v1",
+    "hyprland_toplevel_mapping_manager_v1",
+    "ext_workspace_manager_v1",
+    "kywc_toplevel_manager_v1",
+    "kywc_workspace_manager_v1",
+    "org_kde_plasma_window_management",
+    "org_kde_plasma_virtual_desktop_management",
+    "ukui_window_management",
+    /* outputs */
+    "zwlr_output_manager_v1",
+    "zwlr_output_power_manager_v1",
+    "zwlr_gamma_control_manager_v1",
+    "hyprland_ctm_control_manager_v1",
+    "wp_drm_lease_device_v1",
+    "kde_output_device_v2",
+    "kde_output_management_v2",
+    "kde_primary_output_v1",
+    "org_kde_kwin_dpms_manager",
+    "kywc_output_manager_v1",
+    "ukui_output_management_v1",
+    /* desktop shell components */
+    "zwlr_layer_shell_v1",
+    "ext_session_lock_manager_v1",
+    "hyprland_lock_notifier_v1",
+    "org_kde_plasma_shell",
+    "ukui_shell",
+    "treeland_dde_shell_manager_v1",
+    "treeland_app_id_resolver_manager_v1",
+    /* a sandboxed client must not create nested security contexts */
+    "wp_security_context_manager_v1",
+};
+
+static bool global_is_privileged(const struct wl_global *wl_global)
+{
+    const char *name = wl_global_get_interface(wl_global)->name;
+    for (size_t i = 0; i < sizeof(privileged_interfaces) / sizeof(privileged_interfaces[0]); i++) {
+        if (strcmp(name, privileged_interfaces[i]) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool filter_global(const struct wl_client *wl_client, const struct wl_global *wl_global,
                           void *data)
 {
-    // TODO: add some builtin filter rules
+    const struct wlr_security_context_v1_state *context =
+        manager->security_context
+            ? wlr_security_context_manager_v1_lookup_client(manager->security_context, wl_client)
+            : NULL;
+    if (context && global_is_privileged(wl_global)) {
+        return false;
+    }
 
     struct security_global_filter *filter = global_filter_from_global(wl_global);
     if (!filter) {
@@ -201,6 +290,11 @@ bool security_manager_create(struct server *server)
 
     wl_list_init(&manager->global_filters);
     wl_display_set_global_filter(server->display, filter_global, NULL);
+
+    manager->security_context = wlr_security_context_manager_v1_create(server->display);
+    if (!manager->security_context) {
+        kywc_log(KYWC_WARN, "wp_security_context_manager_v1 create failed");
+    }
 
     return true;
 }

@@ -151,40 +151,36 @@ static int bounded_exclusive_zone(int32_t zone, int32_t margin, int available)
     return amount < available ? (int)amount : available;
 }
 
-static void layer_surface_exclusive_zone(struct wlr_layer_surface_v1_state *state,
+/* the client's exclusive_edge (layer shell v5), else the edge its anchors imply */
+static void layer_surface_exclusive_zone(struct wlr_layer_surface_v1 *layer_surface,
                                          struct kywc_box *usable_area)
 {
+    struct wlr_layer_surface_v1_state *state = &layer_surface->current;
     int amount;
-    switch (state->anchor) {
-    case ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP:
-    case (ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT |
-          ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT):
-        // Anchor top
-        amount = bounded_exclusive_zone(state->exclusive_zone, state->margin.top, usable_area->height);
+    switch (wlr_layer_surface_v1_get_exclusive_edge(layer_surface)) {
+    case WLR_EDGE_TOP:
+        amount = bounded_exclusive_zone(state->exclusive_zone, state->margin.top,
+                                        usable_area->height);
         usable_area->y += amount;
         usable_area->height -= amount;
         break;
-    case ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM:
-    case (ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM | ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT |
-          ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT):
-        // Anchor bottom
-        amount = bounded_exclusive_zone(state->exclusive_zone, state->margin.bottom, usable_area->height);
+    case WLR_EDGE_BOTTOM:
+        amount = bounded_exclusive_zone(state->exclusive_zone, state->margin.bottom,
+                                        usable_area->height);
         usable_area->height -= amount;
         break;
-    case ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT:
-    case (ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM |
-          ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT):
-        // Anchor left
-        amount = bounded_exclusive_zone(state->exclusive_zone, state->margin.left, usable_area->width);
+    case WLR_EDGE_LEFT:
+        amount = bounded_exclusive_zone(state->exclusive_zone, state->margin.left,
+                                        usable_area->width);
         usable_area->x += amount;
         usable_area->width -= amount;
         break;
-    case ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT:
-    case (ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM |
-          ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT):
-        // Anchor right
-        amount = bounded_exclusive_zone(state->exclusive_zone, state->margin.right, usable_area->width);
+    case WLR_EDGE_RIGHT:
+        amount = bounded_exclusive_zone(state->exclusive_zone, state->margin.right,
+                                        usable_area->width);
         usable_area->width -= amount;
+        break;
+    default:
         break;
     }
 }
@@ -287,7 +283,7 @@ static void layer_shell_configure_surface(struct layer_shell *layer_shell,
     // 调用方如果传的是 output->usable_area, 必须先拷一份, 否则会把已保存的工作区
     // 提前改掉, 使 output_update_usable_area() 认为工作区没变化而不再发信号。
     if (layer_surface->surface->mapped && state->exclusive_zone > 0) {
-        layer_surface_exclusive_zone(state, usable_area);
+        layer_surface_exclusive_zone(layer_surface, usable_area);
     }
 }
 
@@ -719,7 +715,7 @@ bool wlr_layer_shell_manager_create(struct server *server)
         return false;
     }
 
-    struct wlr_layer_shell_v1 *wlr_layer_shell = wlr_layer_shell_v1_create(server->display, 4);
+    struct wlr_layer_shell_v1 *wlr_layer_shell = wlr_layer_shell_v1_create(server->display, 5);
     if (!wlr_layer_shell) {
         kywc_log(KYWC_WARN, "wlroots layer shell create failed");
         free(manager);

@@ -46,6 +46,7 @@ Build-Depends:
  wayland-protocols,
  libxcb-shape0-dev,
  libunwind-dev,
+ libei-dev,
  libjpeg-dev,
  libgdm-dev,
  libsystemd-dev,

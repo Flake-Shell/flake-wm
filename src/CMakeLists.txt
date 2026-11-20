@@ -63,6 +63,10 @@ if(HAVE_LIBUNWIND)
   target_link_libraries(flakewm PRIVATE PkgConfig::LIBUNWIND)
 endif()
 
+if(HAVE_LIBEIS)
+  target_link_libraries(flakewm PRIVATE PkgConfig::LIBEIS)
+endif()
+
 if(WLCOM_TRACY)
   target_link_libraries(flakewm PRIVATE PkgConfig::TRACY)
 endif()
