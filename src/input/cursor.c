@@ -207,6 +207,10 @@ void cursor_feed_button(struct cursor *cursor, uint32_t button, bool pressed, ui
         return;
     }
 
+    if (!session_lock_is_active() && focus_grab_handle_button(seat, button, pressed)) {
+        return;
+    }
+
     bool last_is_pressed = cursor->last_click_pressed;
     uint32_t last_button = cursor->last_click_button;
     cursor->last_click_pressed = pressed;

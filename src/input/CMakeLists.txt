@@ -7,6 +7,7 @@ target_sources(flakewm PRIVATE
   event.c
   gesture.c
   emergency_term.c
+  hyprland_focus_grab.c
   hyprland_global_shortcuts.c
   idle.c
   idle_inhibit.c

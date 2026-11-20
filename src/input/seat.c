@@ -262,6 +262,7 @@ void seat_start_pointer_grab(struct seat *seat, struct seat_pointer_grab *pointe
 
     pointer_grab->seat = seat;
     seat->pointer_grab = pointer_grab;
+    focus_grab_cancel(seat);
 
     if (grab && grab->interface->cancel) {
         grab->interface->cancel(grab);
@@ -291,6 +292,7 @@ void seat_start_keyboard_grab(struct seat *seat, struct seat_keyboard_grab *keyb
 
     keyboard_grab->seat = seat;
     seat->keyboard_grab = keyboard_grab;
+    focus_grab_cancel(seat);
 
     if (grab && grab->interface->cancel) {
         grab->interface->cancel(grab);
@@ -313,6 +315,7 @@ void seat_start_touch_grab(struct seat *seat, struct seat_touch_grab *touch_grab
 
     touch_grab->seat = seat;
     seat->touch_grab = touch_grab;
+    focus_grab_cancel(seat);
 
     if (grab && grab->interface->cancel) {
         grab->interface->cancel(grab);
@@ -334,6 +337,7 @@ void seat_reset_input_gesture(struct seat *seat)
 
 void seat_cancel_grabs(struct seat *seat)
 {
+    focus_grab_cancel(seat);
     while (seat->pointer_grab || seat->keyboard_grab || seat->touch_grab) {
         if (seat->pointer_grab) {
             struct seat_pointer_grab *grab = seat->pointer_grab;
@@ -397,6 +401,14 @@ void seat_notify_motion(struct seat *seat, struct wlr_surface *surface, uint32_t
     struct wlr_seat *wlr_seat = seat->wlr_seat;
     struct wlr_surface *prev = wlr_seat->pointer_state.focused_surface;
 
+    /* a focus grab keeps the pointer on its surfaces */
+    if (focus_grab_rejects(seat, surface)) {
+        if (prev && focus_grab_rejects(seat, prev)) {
+            wlr_seat_pointer_notify_clear_focus(wlr_seat);
+        }
+        return;
+    }
+
     if (first_enter || surface != prev) {
         wlr_seat_pointer_notify_enter(wlr_seat, surface, sx, sy);
         kywc_log(KYWC_DEBUG, "pointer enter surface %p", surface);
@@ -433,8 +445,14 @@ void seat_notify_leave(struct seat *seat, struct wlr_surface *surface)
 
 void seat_focus_surface(struct seat *seat, struct wlr_surface *surface)
 {
-    if (session_lock_is_active() && !session_lock_surface_is_allowed(surface)) {
-        surface = session_lock_get_focus_surface();
+    if (session_lock_is_active()) {
+        focus_grab_cancel(seat);
+        if (!session_lock_surface_is_allowed(surface)) {
+            surface = session_lock_get_focus_surface();
+        }
+    } else if (focus_grab_rejects(seat, surface)) {
+        /* a focus grab keeps the keyboard on its surfaces */
+        return;
     }
 
     struct wlr_seat *wlr_seat = seat->wlr_seat;

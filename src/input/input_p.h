@@ -122,6 +122,21 @@ typedef bool (*hyprland_global_shortcut_iterator_func_t)(const char *app_id, con
 void hyprland_global_shortcuts_for_each(hyprland_global_shortcut_iterator_func_t iterator,
                                         void *data);
 
+/* hyprland_focus_grab_manager_v1, see hyprland_focus_grab.c */
+bool hyprland_focus_grab_manager_create(struct input_manager *input_manager);
+
+/* true while a focus grab on this seat keeps input away from the surface */
+bool focus_grab_rejects(struct seat *seat, struct wlr_surface *surface);
+
+/* end the focus grab on this seat, another grab or the lock screen took over */
+void focus_grab_cancel(struct seat *seat);
+
+/* true if the button event is swallowed: a press outside the grab ends it */
+bool focus_grab_handle_button(struct seat *seat, uint32_t button, bool pressed);
+
+/* true if the touch down is swallowed: a touch outside the grab ends it */
+bool focus_grab_handle_touch_down(struct seat *seat, struct wlr_surface *surface);
+
 bool seat_read_config(struct seat *seat);
 
 void seat_write_config(struct seat *seat);
