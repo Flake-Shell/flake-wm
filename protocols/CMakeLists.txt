@@ -34,6 +34,7 @@ set(protocols
   hyprland-focus-grab-v1 hyprland-focus-grab-v1.xml
   hyprland-ctm-control-v1 hyprland-ctm-control-v1.xml
   hyprland-surface-v1 hyprland-surface-v1.xml
+  hyprland-lock-notify-v1 hyprland-lock-notify-v1.xml
   # referenced by the hyprland toplevel protocols, wlroots keeps its copy private
   zwlr-foreign-toplevel-management-v1 ${PROJECT_SOURCE_DIR}/libs/wlroots/protocol/wlr-foreign-toplevel-management-unstable-v1.xml
   hyprland-toplevel-export-v1 hyprland-toplevel-export-v1.xml

@@ -285,6 +285,8 @@ static void session_lock_try_send_locked(struct session_lock *lock)
     lock->locked_sent = true;
     wlr_session_lock_v1_send_locked(lock->protocol_lock);
     kywc_log(KYWC_INFO, "session locked");
+    /* no-op for a replacement locker, the session was locked already */
+    hyprland_lock_notify_set_locked(true);
 }
 
 static void handle_output_geometry(struct wl_listener *listener, void *data)
@@ -494,6 +496,7 @@ static void handle_unlock(struct wl_listener *listener, void *data)
     struct session_lock *lock = wl_container_of(listener, lock, unlock);
     kywc_log(KYWC_INFO, "session unlocked");
     session_lock_destroy(lock, true);
+    hyprland_lock_notify_set_locked(false);
 }
 
 static void handle_lock_abandoned(struct wl_listener *listener, void *data)
@@ -684,5 +687,9 @@ bool session_lock_manager_create(struct server *server)
 
     manager->server_destroy.notify = handle_server_destroy;
     server_add_destroy_listener(server, &manager->server_destroy);
+
+    if (!hyprland_lock_notifier_create(server)) {
+        kywc_log(KYWC_WARN, "failed to create hyprland_lock_notifier_v1");
+    }
     return true;
 }

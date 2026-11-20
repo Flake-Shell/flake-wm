@@ -188,6 +188,7 @@ static const char *const privileged_interfaces[] = {
     /* desktop shell components */
     "zwlr_layer_shell_v1",
     "ext_session_lock_manager_v1",
+    "hyprland_lock_notifier_v1",
     "org_kde_plasma_shell",
     "ukui_shell",
     "treeland_dde_shell_manager_v1",

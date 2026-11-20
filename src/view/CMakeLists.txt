@@ -5,6 +5,7 @@ target_sources(flakewm PRIVATE
   ext_background_effect.c
   ext_workspace.c
   global_authentication.c
+  hyprland_lock_notify.c
   interactive.c
   maximize_switcher.c
   window_switcher.c
