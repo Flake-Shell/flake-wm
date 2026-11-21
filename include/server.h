@@ -59,6 +59,7 @@ struct server {
     /* create for the virtual output */
     struct wlr_backend *headless_backend;
     struct wlr_compositor *compositor;
+    struct wlr_content_type_manager_v1 *content_type_manager;
 
     struct ky_scene *scene;
     struct ky_scene_output_layout *scene_layout;

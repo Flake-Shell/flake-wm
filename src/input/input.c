@@ -736,6 +736,19 @@ struct input *input_by_name(const char *name)
     return NULL;
 }
 
+void input_manager_for_each_input(input_iterator_func_t iterator, void *data)
+{
+    if (!input_manager) {
+        return;
+    }
+    struct input *input, *tmp;
+    wl_list_for_each_safe(input, tmp, &input_manager->inputs, link) {
+        if (iterator(input, data)) {
+            return;
+        }
+    }
+}
+
 struct input *input_from_wlr_input(struct wlr_input_device *wlr_input)
 {
     return wlr_input->data;

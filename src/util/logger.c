@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: GPL-1.0-or-later
 
 #define _POSIX_C_SOURCE 200809L
+#include <pthread.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,11 +30,92 @@ static const char *level_headers[] = {
     [KYWC_WARN] = "[WARN]", [KYWC_INFO] = "[INFO]",   [KYWC_DEBUG] = "[DEBUG]",
 };
 
+#define ROLLING_LOG_SIZE 4096
+
+static struct {
+    pthread_mutex_t lock;
+    char data[ROLLING_LOG_SIZE];
+    size_t len;
+
+    pthread_t main_thread;
+    bool main_thread_known;
+    logger_tap_func_t tap;
+    void *tap_data;
+    bool in_tap;
+} rolling = { .lock = PTHREAD_MUTEX_INITIALIZER };
+
+static void rolling_append(const char *line, size_t len)
+{
+    pthread_mutex_lock(&rolling.lock);
+    if (len + 1 >= ROLLING_LOG_SIZE) {
+        line += len + 2 - ROLLING_LOG_SIZE;
+        len = ROLLING_LOG_SIZE - 2;
+    }
+    size_t need = len + 1;
+    if (rolling.len + need > ROLLING_LOG_SIZE - 1) {
+        /* drop whole lines from the front */
+        size_t drop = rolling.len + need - (ROLLING_LOG_SIZE - 1);
+        char *nl = memchr(rolling.data + drop, '\n', rolling.len - drop);
+        drop = nl ? (size_t)(nl - rolling.data) + 1 : rolling.len;
+        memmove(rolling.data, rolling.data + drop, rolling.len - drop);
+        rolling.len -= drop;
+    }
+    memcpy(rolling.data + rolling.len, line, len);
+    rolling.len += len;
+    rolling.data[rolling.len++] = '\n';
+    rolling.data[rolling.len] = '\0';
+    pthread_mutex_unlock(&rolling.lock);
+}
+
+static void log_rolling(enum kywc_log_level level, const char *fmt, va_list args)
+{
+    char line[1024];
+    int n = snprintf(line, sizeof(line), "%s ", level_headers[level]);
+    if (n < 0) {
+        return;
+    }
+    int m = vsnprintf(line + n, sizeof(line) - n, fmt, args);
+    if (m < 0) {
+        return;
+    }
+    size_t len = (size_t)n + (size_t)m;
+    if (len >= sizeof(line)) {
+        len = sizeof(line) - 1;
+    }
+    rolling_append(line, len);
+
+    if (rolling.tap && !rolling.in_tap && rolling.main_thread_known &&
+        pthread_equal(rolling.main_thread, pthread_self())) {
+        rolling.in_tap = true;
+        rolling.tap(line, rolling.tap_data);
+        rolling.in_tap = false;
+    }
+}
+
+char *logger_rolling_dup(void)
+{
+    pthread_mutex_lock(&rolling.lock);
+    char *copy = strndup(rolling.data, rolling.len);
+    pthread_mutex_unlock(&rolling.lock);
+    return copy;
+}
+
+void logger_set_tap(logger_tap_func_t tap, void *data)
+{
+    rolling.tap = tap;
+    rolling.tap_data = data;
+}
+
 static void log_file(enum kywc_log_level level, const char *fmt, va_list args)
 {
     if (level > log_level) {
         return;
     }
+
+    va_list copy;
+    va_copy(copy, args);
+    log_rolling(level, fmt, copy);
+    va_end(copy);
 
     // FIXME: thread-safe
     if (log_in_realtime) {
@@ -99,6 +182,8 @@ static enum kywc_log_level detect_log_level(enum kywc_log_level level)
 
 void logger_init(enum kywc_log_level level, bool log_to_file, bool realtime)
 {
+    rolling.main_thread = pthread_self();
+    rolling.main_thread_known = true;
     log_in_realtime = realtime;
     log_level = detect_log_level(level);
     fprintf(stdout, "logger: current log level is %s\n", level_headers[log_level]);

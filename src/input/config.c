@@ -11,6 +11,7 @@
 #include "config.h"
 #include "input_p.h"
 #include "util/dbus.h"
+#include "view/hyprland_ipc.h"
 
 static const char *service_input_path = "/com/kylin/Wlcom/Input";
 static const char *service_input_interface = "com.kylin.Wlcom.Input";
@@ -955,6 +956,7 @@ void input_notify_keymap_group(struct input *input, uint32_t group)
 
     dbus_emit_signal(service_input_path, service_input_interface, "KeymapGroupChanged", "su",
                      input->name, group);
+    hyprland_ipc_keyboard_layout(input, group);
 }
 
 bool input_manager_config_init(struct input_manager *input_manager)

@@ -25,6 +25,12 @@ struct wlr_layer_shell_manager {
     struct wl_listener new_output;
     struct wl_listener new_surface;
     struct wl_listener destroy;
+
+    struct {
+        /* data: struct wlr_layer_surface_v1, for the Hyprland IPC */
+        struct wl_signal map;
+        struct wl_signal unmap;
+    } events;
 };
 
 struct layer_output {
@@ -395,6 +401,8 @@ static void layer_shell_handle_map(struct wl_listener *listener, void *data)
     }
 
     layer_shell_keyboard_interactivity(layer_shell, input_manager_get_default_seat());
+
+    wl_signal_emit_mutable(&manager->events.map, layer_surface);
 }
 
 /* called when precommit */
@@ -402,6 +410,8 @@ static void layer_shell_handle_unmap(struct wl_listener *listener, void *data)
 {
     struct layer_shell *layer_shell = wl_container_of(listener, layer_shell, unmap);
     struct wlr_layer_surface_v1 *layer_surface = layer_shell->layer_surface;
+
+    wl_signal_emit_mutable(&manager->events.unmap, layer_surface);
 
     ky_scene_node_set_enabled(&layer_shell->tree->node, false);
     layer_shell_keyboard_interactivity(layer_shell, input_manager_get_default_seat());
@@ -424,6 +434,10 @@ static void layer_shell_handle_destroy(struct wl_listener *listener, void *data)
     if (layer_surface->output && layer_surface->current.exclusive_zone > 0
             && layer_surface->surface->mapped) {
         output = output_from_wlr_output(layer_surface->output);
+    }
+    /* the unmap handler is not reached in that case either */
+    if (layer_surface->surface->mapped) {
+        wl_signal_emit_mutable(&manager->events.unmap, layer_surface);
     }
 
     wl_list_remove(&layer_shell->destroy.link);
@@ -692,8 +706,56 @@ static void handle_new_output(struct wl_listener *listener, void *data)
     output_add_update_usable_area_listener(&output->base, &layer_output->update_usable_area, true);
 }
 
+void wlr_layer_shell_add_map_listener(struct wl_listener *map, struct wl_listener *unmap)
+{
+    if (!manager) {
+        wl_list_init(&map->link);
+        wl_list_init(&unmap->link);
+        return;
+    }
+    wl_signal_add(&manager->events.map, map);
+    wl_signal_add(&manager->events.unmap, unmap);
+}
+
+void wlr_layer_shell_for_each(layer_shell_iterator_func_t iterator, void *data)
+{
+    if (!manager) {
+        return;
+    }
+    struct layer_output *layer_output;
+    wl_list_for_each(layer_output, &manager->outputs, link) {
+        for (int layer = 0; layer < 4; layer++) {
+            struct layer_shell *layer_shell;
+            /* inserted at the head, oldest last */
+            wl_list_for_each_reverse(layer_shell, &layer_output->shells[layer], link) {
+                struct wlr_layer_surface_v1 *layer_surface = layer_shell->layer_surface;
+                if (!layer_surface->surface->mapped) {
+                    continue;
+                }
+                int x = 0, y = 0;
+                ky_scene_node_coords(&layer_shell->tree->node, &x, &y);
+                struct kywc_box box = { x, y, layer_surface->surface->current.width,
+                                        layer_surface->surface->current.height };
+                iterator(layer_surface, &layer_output->output->base, layer, &box, data);
+            }
+        }
+    }
+}
+
+static void detach_listeners(struct wl_signal *signal)
+{
+    struct wl_listener *listener, *tmp;
+    wl_list_for_each_safe(listener, tmp, &signal->listener_list, link) {
+        wl_list_remove(&listener->link);
+        wl_list_init(&listener->link);
+    }
+}
+
 static void handle_destroy(struct wl_listener *listener, void *data)
 {
+    /* listeners may outlive the manager, leave them removable */
+    detach_listeners(&manager->events.map);
+    detach_listeners(&manager->events.unmap);
     wl_list_remove(&manager->destroy.link);
     wl_list_remove(&manager->new_surface.link);
     wl_list_remove(&manager->new_output.link);
@@ -723,6 +785,8 @@ bool wlr_layer_shell_manager_create(struct server *server)
     }
 
     wl_list_init(&manager->outputs);
+    wl_signal_init(&manager->events.map);
+    wl_signal_init(&manager->events.unmap);
 
     /* create bottom and top layer tree not in workspace */
     manager->layers[0] = *view_manager_get_layer(LAYER_DESKTOP, false);

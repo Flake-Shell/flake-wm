@@ -326,8 +326,8 @@ static bool wlroots_server_init(struct server *server)
 
     /* wl_buffers of a single solid color, sampled through the data_ptr texture path */
     wlr_single_pixel_buffer_manager_v1_create(server->display);
-    /* content hints only, nothing consumes them yet */
-    wlr_content_type_manager_v1_create(server->display, 1);
+    /* content hints, reported by the Hyprland IPC */
+    server->content_type_manager = wlr_content_type_manager_v1_create(server->display, 1);
     /* the multiplier is applied to the scene buffer in scene/surface.c */
     wlr_alpha_modifier_v1_create(server->display);
     color_manager_create(server);

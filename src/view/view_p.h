@@ -246,9 +246,18 @@ wlr_foreign_toplevel_manager_create(struct server *server)
 #endif
 
 struct wlr_surface;
+struct wlr_layer_surface_v1;
+/* layer: 0 background .. 3 overlay; box in layout coordinates */
+typedef void (*layer_shell_iterator_func_t)(struct wlr_layer_surface_v1 *layer_surface,
+                                            struct kywc_output *output, int layer,
+                                            struct kywc_box *box, void *data);
 #if HAVE_WLR_LAYER_SHELL
 bool wlr_layer_shell_manager_create(struct server *server);
 void wlr_layer_shell_reconfigure_surface(struct wlr_surface *surface);
+/* mapped layer surfaces per output and layer, oldest first */
+void wlr_layer_shell_for_each(layer_shell_iterator_func_t iterator, void *data);
+/* data is the struct wlr_layer_surface_v1, unmap also comes for surfaces destroyed mapped */
+void wlr_layer_shell_add_map_listener(struct wl_listener *map, struct wl_listener *unmap);
 #else
 static __attribute__((unused)) inline bool wlr_layer_shell_manager_create(struct server *server)
 {
@@ -257,6 +266,16 @@ static __attribute__((unused)) inline bool wlr_layer_shell_manager_create(struct
 static __attribute__((unused)) inline void
 wlr_layer_shell_reconfigure_surface(struct wlr_surface *surface)
 {
+}
+static __attribute__((unused)) inline void
+wlr_layer_shell_for_each(layer_shell_iterator_func_t iterator, void *data)
+{
+}
+static __attribute__((unused)) inline void
+wlr_layer_shell_add_map_listener(struct wl_listener *map, struct wl_listener *unmap)
+{
+    wl_list_init(&map->link);
+    wl_list_init(&unmap->link);
 }
 #endif
 
