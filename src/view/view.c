@@ -1036,6 +1036,22 @@ struct kywc_view *kywc_view_by_uuid(const char *uuid)
     return NULL;
 }
 
+uint32_t view_get_hyprland_handle(struct view *view)
+{
+    return (uint32_t)(uintptr_t)view;
+}
+
+struct view *view_from_hyprland_handle(uint32_t handle)
+{
+    struct view *view;
+    wl_list_for_each(view, &view_manager->views, link) {
+        if (view->base.mapped && view_get_hyprland_handle(view) == handle) {
+            return view;
+        }
+    }
+    return NULL;
+}
+
 struct view *view_from_kywc_view(struct kywc_view *kywc_view)
 {
     struct view *view = wl_container_of(kywc_view, view, base);
@@ -2311,11 +2327,13 @@ struct view_manager *view_manager_create(struct server *server)
     kde_plasma_window_management_create(server);
     kde_appmenu_manager_create(server);
     kde_blur_manager_create(server);
+    ext_background_effect_manager_create(server);
     treeland_dde_shell_manager_create(server);
     treeland_personalization_manager_create(server);
     kde_slide_manager_create(server);
     xdg_dialog_create(server);
     xdg_activation_create(server);
+    xdg_extras_create(server);
     ukui_shell_create(server);
     ukui_window_management_create(server);
     ukui_blur_manager_create(server);

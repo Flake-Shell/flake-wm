@@ -291,6 +291,20 @@ $ sudo cmake --install build
 
 
 
+#### FreeBSD
+
+支持FreeBSD 15及以上。sd-bus由`devel/basu`提供，libudev由`devel/libudev-devd`提供；fbdev后端与GXDE会话启动脚本(`startflakewm`，它会启动`startdde`)仅限Linux，不会编译。Port位于[freebsd/](./freebsd)，用当前源码树(而非发布tarball)打包:
+
+```sh
+# cp -R freebsd /usr/ports/x11-wm/flakewm
+# cd /usr/ports/x11-wm/flakewm
+# make FLAKEWM_SRC=/path/to/flake-wm package
+```
+
+系统默认配置安装在`/usr/local/etc/flakewm/config.json`。合成器通过`seatd`打开显卡与输入设备(`sysrc seatd_enable=YES`)。
+
+
+
 #### 手动编辑 (构建脚本)
 
 构建脚本位于[./build-deb](./build-deb), 这是个shell脚本，用于在调试时生成安装包，便于在调试机器上轻松部署与卸载。
@@ -361,7 +375,13 @@ Usage: kylin-wlcom [options] [command]
   -s, --session <process>  Run session on startup\n
   -v, --version            Show the version number and quit.\n
   -V, --verbose            Enables more verbose logging.\n
+      --no-default-keybind Register no key bindings on startup.\n
+      --emergency-term-keybind Bind Win+q to open a terminal.\n
 ```
+
+`--no-default-keybind` 启动时不注册任何快捷键：既不注册内置快捷键（窗口操作、切换工作区、Alt+Tab、多任务视图等），也不注册 InputAction 配置里的快捷键。已保存的动作仍会列出，可通过 `ControlAction enable` 绑定
+
+`--emergency-term-keybind` 启用 Win+q 打开终端，不受 `--no-default-keybind` 影响。
 
 
 

@@ -96,7 +96,7 @@ struct config_manager *config_manager_create(struct server *server)
         config_manager->json = json_object_from_file(config_manager->file);
     }
     /* get system default config */
-    config_manager->sys_json = json_object_from_file("/etc/flakewm/config.json");
+    config_manager->sys_json = json_object_from_file(WLCOM_SYSCONFDIR "/config.json");
     kywc_log(KYWC_INFO, "get the sys default config from the etc directory");
     if (!config_manager->sys_json) {
         kywc_log(KYWC_WARN, "the default config does not exist");

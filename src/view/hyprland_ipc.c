@@ -163,7 +163,6 @@ struct hypr_ipc {
     struct wl_list mru;        // hypr_window.mru_link, most recent first
     struct wl_list monitors;   // hypr_monitor.link
     struct wl_list workspaces; // hypr_workspace.link
-    uint64_t next_address;
 
     struct wl_event_source *idle;
     bool terminating;
@@ -965,7 +964,8 @@ static void handle_new_mapped_view(struct wl_listener *listener, void *data)
     }
     win->ipc = ipc;
     win->view = view;
-    win->address = ipc->next_address++;
+    /* same address as hyprland-toplevel-mapping, toplevel-export takes its low 32 bits */
+    win->address = (uint64_t)(uintptr_t)view;
     win->initial_class = view->base.app_id ? strdup(view->base.app_id) : NULL;
     win->initial_title = view->base.title ? strdup(view->base.title) : NULL;
     wl_list_insert(&ipc->windows, &win->link);
@@ -2552,7 +2552,6 @@ bool hyprland_ipc_create(struct view_manager *view_manager)
     ipc->view_manager = view_manager;
     ipc->server = view_manager->server;
     ipc->request_fd = ipc->event_fd = -1;
-    ipc->next_address = 0x1000;
     ipc->announced_mon_id = -1;
     wl_list_init(&ipc->requests);
     wl_list_init(&ipc->subscribers);

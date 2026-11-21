@@ -10,6 +10,7 @@
 #include "output.h"
 #include "scene/xdg_shell.h"
 #include "view/action.h"
+#include "view/workspace.h"
 #include "view_p.h"
 
 struct xdg_view {
@@ -33,6 +34,24 @@ struct xdg_view {
     struct wl_listener set_parent;
     struct wl_listener set_title;
     struct wl_listener set_app_id;
+
+    /* suspended while minimized or off the current workspace, see xdg_view_update_suspended */
+    struct wl_list link;  // suspend.views, while mapped
+    struct wl_listener minimize;
+    struct wl_listener workspace_enter;
+    struct wl_listener workspace_leave;
+};
+
+struct workspace_watch {
+    struct wl_listener activate;
+    struct wl_listener destroy;
+};
+
+static struct {
+    struct wl_list views;
+    struct wl_listener new_workspace;
+} suspend = {
+    .views = { &suspend.views, &suspend.views },
 };
 
 static bool xdg_view_hover(struct seat *seat, struct ky_scene_node *node, double x, double y,
@@ -368,6 +387,73 @@ static void xdg_view_handle_set_app_id(struct wl_listener *listener, void *data)
     view_set_app_id(&xdg_view->view, app_id);
 }
 
+/* tell the client it is not seen, so it can stop rendering (xdg_wm_base v6) */
+static void xdg_view_update_suspended(struct xdg_view *xdg_view)
+{
+    struct wlr_xdg_toplevel *toplevel = xdg_view->wlr_xdg_surface->toplevel;
+    if (wl_resource_get_version(toplevel->resource) < XDG_TOPLEVEL_STATE_SUSPENDED_SINCE_VERSION) {
+        return;
+    }
+
+    struct view *view = &xdg_view->view;
+    struct workspace *current = workspace_manager_get_current();
+    bool suspended = view->base.minimized || !current || !view_proxy_by_workspace(view, current);
+    if (toplevel->scheduled.suspended != suspended) {
+        wlr_xdg_toplevel_set_suspended(toplevel, suspended);
+    }
+}
+
+static void xdg_view_handle_minimize(struct wl_listener *listener, void *data)
+{
+    struct xdg_view *xdg_view = wl_container_of(listener, xdg_view, minimize);
+    xdg_view_update_suspended(xdg_view);
+}
+
+static void xdg_view_handle_workspace_enter(struct wl_listener *listener, void *data)
+{
+    struct xdg_view *xdg_view = wl_container_of(listener, xdg_view, workspace_enter);
+    xdg_view_update_suspended(xdg_view);
+}
+
+static void xdg_view_handle_workspace_leave(struct wl_listener *listener, void *data)
+{
+    struct xdg_view *xdg_view = wl_container_of(listener, xdg_view, workspace_leave);
+    xdg_view_update_suspended(xdg_view);
+}
+
+static void handle_workspace_activate(struct wl_listener *listener, void *data)
+{
+    struct xdg_view *xdg_view;
+    wl_list_for_each(xdg_view, &suspend.views, link) {
+        xdg_view_update_suspended(xdg_view);
+    }
+}
+
+static void handle_workspace_destroy(struct wl_listener *listener, void *data)
+{
+    struct workspace_watch *watch = wl_container_of(listener, watch, destroy);
+    wl_list_remove(&watch->activate.link);
+    wl_list_remove(&watch->destroy.link);
+    free(watch);
+}
+
+static void watch_workspace(struct workspace *workspace)
+{
+    struct workspace_watch *watch = calloc(1, sizeof(*watch));
+    if (!watch) {
+        return;
+    }
+    watch->activate.notify = handle_workspace_activate;
+    wl_signal_add(&workspace->events.activate, &watch->activate);
+    watch->destroy.notify = handle_workspace_destroy;
+    wl_signal_add(&workspace->events.destroy, &watch->destroy);
+}
+
+static void handle_new_workspace(struct wl_listener *listener, void *data)
+{
+    watch_workspace(data);
+}
+
 static void xdg_view_handle_map(struct wl_listener *listener, void *data)
 {
     struct xdg_view *xdg_view = wl_container_of(listener, xdg_view, map);
@@ -415,6 +501,15 @@ static void xdg_view_handle_map(struct wl_listener *listener, void *data)
     wl_client_get_credentials(client, &xdg_view->view.pid, NULL, NULL);
     view_map(&xdg_view->view);
     treeland_personalization_apply_view_popup_effects(&xdg_view->view);
+
+    wl_list_insert(&suspend.views, &xdg_view->link);
+    xdg_view->minimize.notify = xdg_view_handle_minimize;
+    wl_signal_add(&kywc_view->events.minimize, &xdg_view->minimize);
+    xdg_view->workspace_enter.notify = xdg_view_handle_workspace_enter;
+    wl_signal_add(&xdg_view->view.events.workspace_enter, &xdg_view->workspace_enter);
+    xdg_view->workspace_leave.notify = xdg_view_handle_workspace_leave;
+    wl_signal_add(&xdg_view->view.events.workspace_leave, &xdg_view->workspace_leave);
+    xdg_view_update_suspended(xdg_view);
 }
 
 static void xdg_view_handle_unmap(struct wl_listener *listener, void *data)
@@ -430,6 +525,10 @@ static void xdg_view_handle_unmap(struct wl_listener *listener, void *data)
     wl_list_remove(&xdg_view->set_parent.link);
     wl_list_remove(&xdg_view->set_title.link);
     wl_list_remove(&xdg_view->set_app_id.link);
+    wl_list_remove(&xdg_view->link);
+    wl_list_remove(&xdg_view->minimize.link);
+    wl_list_remove(&xdg_view->workspace_enter.link);
+    wl_list_remove(&xdg_view->workspace_leave.link);
 
     view_unmap(&xdg_view->view);
 }
@@ -509,7 +608,7 @@ static void handle_xdg_shell_destroy(struct wl_listener *listener, void *data)
 bool xdg_shell_init(struct view_manager *view_manager)
 {
     struct server *server = view_manager->server;
-    struct wlr_xdg_shell *xdg_shell = wlr_xdg_shell_create(server->display, 5);
+    struct wlr_xdg_shell *xdg_shell = wlr_xdg_shell_create(server->display, 7);
     if (!xdg_shell) {
         kywc_log(KYWC_ERROR, "unable to create xdg shell");
         return false;
@@ -519,6 +618,17 @@ bool xdg_shell_init(struct view_manager *view_manager)
     wl_signal_add(&xdg_shell->events.new_toplevel, &view_manager->new_xdg_surface);
     view_manager->xdg_shell_destroy.notify = handle_xdg_shell_destroy;
     wl_signal_add(&xdg_shell->events.destroy, &view_manager->xdg_shell_destroy);
+
+    /* the workspaces exist already, later ones come through new_workspace */
+    for (uint32_t i = 0;; i++) {
+        struct workspace *workspace = workspace_by_position(i);
+        if (!workspace) {
+            break;
+        }
+        watch_workspace(workspace);
+    }
+    suspend.new_workspace.notify = handle_new_workspace;
+    workspace_manager_add_new_listener(&suspend.new_workspace);
 
     return true;
 }

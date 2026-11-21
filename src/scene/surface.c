@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <wlr/render/drm_syncobj.h>
+#include <wlr/types/wlr_alpha_modifier_v1.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_fractional_scale_v1.h>
 #include <wlr/types/wlr_linux_drm_syncobj_v1.h>
@@ -221,12 +222,39 @@ static void scene_surface_signal_release(struct ky_scene_surface *surface)
     }
 }
 
+/**
+ * wp_alpha_modifier_v1 and hyprland_surface_v1: the multipliers are
+ * double-buffered surface state, and the buffer opacity is their product.
+ * Only touch the buffer opacity while the client uses one of them, so
+ * opacity set by the compositor (xwayland _NET_WM_WINDOW_OPACITY ...) is kept,
+ * and restore it once both objects are gone. The hyprland opacity also fades
+ * the blur behind the surface.
+ */
+static void scene_surface_update_alpha(struct ky_scene_surface *surface)
+{
+    const struct wlr_alpha_modifier_surface_v1_state *alpha =
+        wlr_alpha_modifier_v1_get_surface_state(surface->surface);
+    float hyprland_opacity = 1.0f;
+    bool hyprland = hyprland_surface_get_opacity(surface->surface, &hyprland_opacity);
+    ky_scene_buffer_set_blur_opacity(surface->buffer, hyprland_opacity);
+
+    if (alpha || hyprland) {
+        float multiplier = alpha ? alpha->multiplier : 1.0f;
+        ky_scene_buffer_set_opacity(surface->buffer, multiplier * hyprland_opacity);
+        surface->alpha_modified = true;
+    } else if (surface->alpha_modified) {
+        ky_scene_buffer_set_opacity(surface->buffer, 1.0f);
+        surface->alpha_modified = false;
+    }
+}
+
 static void handle_scene_surface_surface_commit(struct wl_listener *listener, void *data)
 {
     struct ky_scene_surface *surface = wl_container_of(listener, surface, surface_commit);
     struct ky_scene_buffer *scene_buffer = surface->buffer;
 
     set_buffer_with_surface_state(scene_buffer, surface->surface);
+    scene_surface_update_alpha(surface);
     scene_surface_signal_release(surface);
 
     // If the surface has requested a frame done event, honour that. The
@@ -249,6 +277,7 @@ static void handle_scene_surface_surface_map(struct wl_listener *listener, void 
     struct ky_scene_surface *surface = wl_container_of(listener, surface, surface_map);
 
     set_buffer_with_surface_state(surface->buffer, surface->surface);
+    scene_surface_update_alpha(surface);
 }
 
 static bool scene_buffer_point_accepts_input(struct ky_scene_buffer *scene_buffer, double *sx,
@@ -369,6 +398,7 @@ struct ky_scene_surface *ky_scene_surface_create(struct ky_scene_tree *parent,
                    &surface_node_addon_impl);
 
     set_buffer_with_surface_state(scene_buffer, wlr_surface);
+    scene_surface_update_alpha(surface);
 
     return surface;
 }

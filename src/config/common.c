@@ -2,7 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-1.0-or-later
 
+#include <stdlib.h>  // defines __GLIBC__ on glibc
+#ifdef __GLIBC__
 #include <malloc.h>
+#endif
 
 #include "config_p.h"
 #include "server.h"
@@ -42,7 +45,10 @@ static int print_config(sd_bus_message *m, void *userdata, sd_bus_error *ret_err
 static int handle_timeout(void *data)
 {
     wl_event_source_timer_update(config.timer, 5000);
+#ifdef __GLIBC__
+    /* glibc keeps freed heap pages, other allocators give them back themselves */
     malloc_trim(4096);
+#endif
     return 0;
 }
 

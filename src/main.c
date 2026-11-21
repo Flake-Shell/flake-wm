@@ -2,7 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-1.0-or-later
 
+#ifndef __FreeBSD__  // FreeBSD hides sa_sigaction and SA_SIGINFO under plain POSIX
 #define _POSIX_C_SOURCE 200809L
+#endif
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -39,15 +41,21 @@ static struct wl_event_source *session_xwayland_timeout = NULL;
 static int child_pipe[2] = {-1, -1};
 static struct wl_event_source *child_source;
 
-/* The hyprland UNIX IPC arg is so long that it cannot be held in char. */
+/* long-only options, out of the char range */
 enum {
-    OPT_HYPR_UNIX_SOCKET_SIM = 0x100,
+    OPT_NO_DEFAULT_KEYBIND = 0x100,
+    OPT_EMERGENCY_TERM_KEYBIND,
+    OPT_HYPR_UNIX_SOCKET_SIM,
 };
 
 static const struct option long_options[] = {
-    { "help", no_argument, NULL, 'h' },    { "debug", no_argument, NULL, 'd' },
-    { "version", no_argument, NULL, 'v' }, { "session", required_argument, NULL, 's' },
+    { "help", no_argument, NULL, 'h' },
+    { "debug", no_argument, NULL, 'd' },
+    { "version", no_argument, NULL, 'v' },
+    { "session", required_argument, NULL, 's' },
     { "verbose", no_argument, NULL, 'V' },
+    { "no-default-keybind", no_argument, NULL, OPT_NO_DEFAULT_KEYBIND },
+    { "emergency-term-keybind", no_argument, NULL, OPT_EMERGENCY_TERM_KEYBIND },
     { "hypr-unix-socket-sim-enable", no_argument, NULL, OPT_HYPR_UNIX_SOCKET_SIM },
     { 0, 0, 0, 0 },
 };
@@ -61,6 +69,12 @@ static const char usage[] =
     "  -s, --session <process>  Run session on startup.\n"
     "  -v, --version            Show the version number and quit.\n"
     "  -V, --verbose            Enables more verbose logging.\n"
+    "      --no-default-keybind Register no key bindings on startup, neither the\n"
+    "                           built-in ones nor those in the InputAction config.\n"
+    "                           Bindings added at runtime (InputAction D-Bus,\n"
+    "                           KGlobalAccel) still work.\n"
+    "      --emergency-term-keybind\n"
+    "                           Bind Win+q to open a terminal.\n"
     "      --hypr-unix-socket-sim-enable\n"
     "                           Serve Hyprland-compatible IPC sockets and export\n"
     "                           HYPRLAND_INSTANCE_SIGNATURE (off by default).\n"
@@ -313,6 +327,12 @@ int main(int argc, char *argv[])
             break;
         case 'V': // verbose
             enable_verbose = true;
+            break;
+        case OPT_NO_DEFAULT_KEYBIND:
+            server.options.no_default_keybind = true;
+            break;
+        case OPT_EMERGENCY_TERM_KEYBIND:
+            server.options.emergency_term_keybind = true;
             break;
         case OPT_HYPR_UNIX_SOCKET_SIM:
             server.options.enable_hypr_unix_socket_sim = true;

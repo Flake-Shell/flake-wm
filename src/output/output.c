@@ -518,6 +518,7 @@ static struct output *output_create(const char *name, struct wlr_output *wlr_out
 
     output->drm_fd = -1;
     output->gamma[0] = output->gamma[1] = output->gamma[2] = 1.0f;
+    output->ctm[0] = output->ctm[1] = output->ctm[2] = 1.0f;
     output->wlr_output = wlr_output;
     wlr_output->data = output;
 
@@ -867,6 +868,11 @@ static void handle_new_output(struct wl_listener *listener, void *data)
     struct server *server = output_manager->server;
     struct wlr_output *wlr_output = data;
 
+    /* VR headsets and the like are leased to clients, not part of the desktop */
+    if (wlr_output->non_desktop && output_drm_lease_offer(wlr_output)) {
+        return;
+    }
+
     if (!wlr_output_init_render(wlr_output, server->allocator, server->renderer)) {
         kywc_log(KYWC_ERROR, "unable to init output renderer");
         return;
@@ -1200,6 +1206,8 @@ struct output_manager *output_manager_create(struct server *server)
     wlr_output_management_create(server);
     ukui_output_management_create(server);
     output_gamma_control_create(server);
+    hyprland_ctm_control_create(server);
+    output_drm_lease_create(server);
     output_gamma_dbus_init(output_manager);
     output_night_mode_create(server);
 
@@ -1437,7 +1445,7 @@ bool output_state_attempt_gamma(struct output *output, struct wlr_output_state *
     uint32_t color_temp = output_effective_color_temp(output);
 
     if (!output_set_gamma_lut(output->wlr_output, output->base.prop.gamma_size, state,
-                              output->gamma, color_temp, brightness)) {
+                              output->ctm, output->gamma, color_temp, brightness)) {
         return false;
     }
     return true;

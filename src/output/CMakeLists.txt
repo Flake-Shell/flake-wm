@@ -1,6 +1,8 @@
 target_sources(flakewm PRIVATE
+  drm_lease.c
   gamma.c
   gamma_dbus.c
+  hyprland_ctm_control.c
   night_mode.c
   config.c
   layout.c

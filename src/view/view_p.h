@@ -210,6 +210,13 @@ bool xdg_dialog_create(struct server *server);
 
 bool xdg_activation_create(struct server *server);
 
+/* xdg-foreign v2, xdg-system-bell, xdg-toplevel-tag, see xdg_extras.c */
+bool xdg_extras_create(struct server *server);
+
+bool ext_workspace_manager_create(struct server *server);
+
+bool ext_background_effect_manager_create(struct server *server);
+
 struct view_mode *view_manager_mode_from_name(const char *name);
 
 struct view_mode *view_manager_mode_register(const struct view_mode_interface *impl);

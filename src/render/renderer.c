@@ -213,7 +213,7 @@ bool ky_renderer_init_wl_display(struct wlr_renderer *renderer, struct wlr_backe
         return true;
     }
 
-    *linux_dmabuf_v1 = wlr_linux_dmabuf_v1_create_with_renderer(wl_display, 4, renderer);
+    *linux_dmabuf_v1 = wlr_linux_dmabuf_v1_create_with_renderer(wl_display, 5, renderer);
     if (!*linux_dmabuf_v1 ||
         !ky_linux_dmabuf_init_vmware_check(*linux_dmabuf_v1, wlr_renderer_get_drm_fd(renderer))) {
         return false;

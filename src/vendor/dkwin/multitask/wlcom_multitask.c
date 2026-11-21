@@ -1577,8 +1577,9 @@ bool multitask_view_create(struct view_manager *view_manager)
         "Win+Tab:no",
         "Win+s:no",
     };
-    bool registered = false;
-    for (size_t i = 0; i < sizeof(shortcuts) / sizeof(shortcuts[0]); ++i) {
+    /* without default key bindings the view is still reachable by other means */
+    bool registered = kywc_key_binding_defaults_disabled();
+    for (size_t i = 0; !registered && i < sizeof(shortcuts) / sizeof(shortcuts[0]); ++i) {
         struct key_binding *binding =
             kywc_key_binding_create(shortcuts[i], "toggle multitasking view");
         if (binding &&

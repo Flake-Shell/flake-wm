@@ -296,6 +296,7 @@ error:
     return NULL;
 }
 
+#if HAVE_FBDEV
 static bool find_drm_cards(struct wl_display *display)
 {
     struct udev *udev = udev_new();
@@ -359,6 +360,7 @@ out:
     udev_unref(udev);
     return found;
 }
+#endif
 
 struct wlr_backend *ky_backend_autocreate(struct wl_display *display,
                                           struct wlr_session **session_ptr)
@@ -372,9 +374,14 @@ struct wlr_backend *ky_backend_autocreate(struct wl_display *display,
         return wlr_backend_autocreate(wl_display_get_event_loop(display), session_ptr);
     }
 
+#if HAVE_FBDEV
     struct wlr_backend *backend = NULL;
     if (find_drm_cards(display)) {
         backend = wlr_backend_autocreate(wl_display_get_event_loop(display), session_ptr);
     }
     return backend ? backend : ky_fbdev_backend_create(display, session_ptr);
+#else
+    /* no framebuffer fallback to probe for (FreeBSD) */
+    return wlr_backend_autocreate(wl_display_get_event_loop(display), session_ptr);
+#endif
 }

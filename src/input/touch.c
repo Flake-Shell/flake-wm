@@ -492,6 +492,10 @@ bool touch_handle_down(struct wlr_touch_down_event *event)
     struct wlr_surface *toplevel = NULL;
     double sx, sy;
     struct wlr_surface *surface = touch_get_surface(touch, &sx, &sy, &toplevel);
+    /* a touch outside a focus grab ends it and is swallowed */
+    if (!session_lock_is_active() && focus_grab_handle_touch_down(seat, surface)) {
+        return true;
+    }
     if (!surface || !wlr_surface_accepts_touch(surface, seat->wlr_seat)) {
         return false;
     }

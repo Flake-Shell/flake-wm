@@ -1,0 +1,19 @@
+[
+{ type: install
+  message: <<EOM
+flakewm needs a seat manager to open the GPU and input devices:
+
+  # sysrc seatd_enable=YES
+  # service seatd start
+  # pw groupmod video -m <user>
+
+The GPU needs a DRM driver, e.g. graphics/drm-kmod. Then, from a text
+console, start the compositor with a session command:
+
+  % flakewm -s <command>
+
+The system-wide defaults are in %%PREFIX%%/etc/flakewm/config.json, the
+per-user configuration is written to ~/.config/flakewm.
+EOM
+}
+]

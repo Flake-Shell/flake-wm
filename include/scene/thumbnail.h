@@ -40,6 +40,10 @@ struct thumbnail *thumbnail_create_from_workspace(struct workspace *workspace,
                                                   struct kywc_output *output, float scale,
                                                   bool single_plane);
 
+struct thumbnail *thumbnail_create_from_workspace_scene(struct workspace *workspace,
+                                                        struct kywc_output *output,
+                                                        bool windows_only);
+
 struct thumbnail *thumbnail_create_from_output(struct ky_scene_output *output,
                                                struct kywc_output_state *output_state, float scale);
 

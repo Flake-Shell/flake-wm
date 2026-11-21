@@ -323,6 +323,10 @@ static void view_shortcuts(struct key_binding *binding, void *data)
 
 bool window_actions_create(struct view_manager *view_manager)
 {
+    if (kywc_key_binding_defaults_disabled()) {
+        return true;
+    }
+
     for (size_t i = 0; i < sizeof(window_shortcuts) / sizeof(struct window_shortcut); i++) {
         struct window_shortcut *shortcut = &window_shortcuts[i];
         struct key_binding *binding = kywc_key_binding_create(shortcut->keybind, shortcut->desc);
@@ -455,7 +459,10 @@ static void gestures_action(struct gesture_binding *binding, void *data, double 
 
 bool view_manager_actions_create(struct view_manager *view_manager)
 {
-    for (size_t i = 0; i < sizeof(shortcuts) / sizeof(struct shortcut); i++) {
+    /* gestures are not key bindings, they stay */
+    for (size_t i = 0;
+         !kywc_key_binding_defaults_disabled() && i < sizeof(shortcuts) / sizeof(struct shortcut);
+         i++) {
         struct shortcut *shortcut = &shortcuts[i];
         struct key_binding *binding = kywc_key_binding_create(shortcut->keybind, shortcut->desc);
         if (!binding) {

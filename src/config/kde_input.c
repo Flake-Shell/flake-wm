@@ -4,6 +4,7 @@
 
 #define _POSIX_C_SOURCE 200809L
 #include <libinput.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "config_p.h"

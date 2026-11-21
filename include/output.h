@@ -68,6 +68,8 @@ struct output {
     uint32_t brightness;
     /* per-channel gamma like xrandr --gamma, 1.0 is identity, hardware gamma only */
     float gamma[3];
+    /* per-channel scale from hyprland-ctm-control, 1.0 is identity, applied before gamma */
+    float ctm[3];
     enum kywc_output_vrr_policy vrr_policy;
     bool gamma_changed;
 

@@ -1,0 +1,9 @@
+{
+	global:
+		kywc_*;
+		/* defined by crt1 on FreeBSD, shared libraries (glib) resolve them from the executable */
+		environ;
+		__progname;
+	local:
+		*;
+};

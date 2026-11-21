@@ -146,6 +146,11 @@ void cursor_feed_motion(struct cursor *cursor, uint32_t time, struct wlr_input_d
         return;
     }
 
+    /* before the cursor is clamped to the layout, barriers lie on its edge */
+    if (input_capture_handle_motion(cursor->seat, cursor->lx, cursor->ly, dx, dy)) {
+        return;
+    }
+
     wlr_relative_pointer_manager_v1_send_relative_motion(
         cursor->seat->manager->relative_pointer, cursor->seat->wlr_seat, (uint64_t)time * 1000, dx,
         dy, dx_unaccel, dy_unaccel);
@@ -202,8 +207,20 @@ void cursor_feed_button(struct cursor *cursor, uint32_t button, bool pressed, ui
                         uint32_t double_click_time)
 {
     struct seat *seat = cursor->seat;
+    if (input_capture_handle_button(button, pressed)) {
+        return;
+    }
+    if (hotkeys_handle_button(seat, button, pressed, time,
+                              !session_lock_is_active() && !seat->pointer_grab)) {
+        return;
+    }
+
     if (!session_lock_is_active() && seat->pointer_grab && seat->pointer_grab->interface->button &&
         seat->pointer_grab->interface->button(seat->pointer_grab, time, button, pressed)) {
+        return;
+    }
+
+    if (!session_lock_is_active() && focus_grab_handle_button(seat, button, pressed)) {
         return;
     }
 
@@ -299,7 +316,7 @@ static void cursor_handle_motion(struct wl_listener *listener, void *data)
     struct wlr_pointer_motion_event *event = data;
     idle_manager_notify_activity(cursor->seat);
 
-    cursor_set_hidden(cursor, false);
+    cursor_set_hidden(cursor, input_capture_is_active());
     cursor_feed_motion(cursor, event->time_msec, &event->pointer->base, event->delta_x,
                        event->delta_y, event->unaccel_dx, event->unaccel_dy);
 }
@@ -310,7 +327,7 @@ static void cursor_handle_motion_absolute(struct wl_listener *listener, void *da
     struct wlr_pointer_motion_absolute_event *event = data;
     idle_manager_notify_activity(cursor->seat);
 
-    cursor_set_hidden(cursor, false);
+    cursor_set_hidden(cursor, input_capture_is_active());
     cursor_motion_absolute(cursor, event->time_msec, &event->pointer->base, event->x, event->y);
 }
 
@@ -320,7 +337,7 @@ static void cursor_handle_button(struct wl_listener *listener, void *data)
     struct wlr_pointer_button_event *event = data;
     idle_manager_notify_activity(cursor->seat);
 
-    cursor_set_hidden(cursor, false);
+    cursor_set_hidden(cursor, input_capture_is_active());
     struct input *input = input_from_wlr_input(&event->pointer->base);
     cursor_feed_button(cursor, event->button, event->state == WL_POINTER_BUTTON_STATE_PRESSED, event->time_msec,
                        input->state.double_click_time);
@@ -331,6 +348,12 @@ void cursor_feed_axis(struct cursor *cursor, uint32_t orientation, uint32_t sour
                       enum wl_pointer_axis_relative_direction relative_direction)
 {
     struct seat *seat = cursor->seat;
+    if (input_capture_handle_axis(source, orientation == WL_POINTER_AXIS_VERTICAL_SCROLL, delta,
+                                  delta_discrete)) {
+        return;
+    }
+    hotkeys_cancel_taps();
+
     if (!session_lock_is_active() && seat->pointer_grab && seat->pointer_grab->interface->axis &&
         seat->pointer_grab->interface->axis(seat->pointer_grab, time,
                                             orientation == WL_POINTER_AXIS_VERTICAL_SCROLL, delta)) {
@@ -355,7 +378,7 @@ static void cursor_handle_axis(struct wl_listener *listener, void *data)
     }
     time_tmp = event->time_msec;
 
-    cursor_set_hidden(cursor, false);
+    cursor_set_hidden(cursor, input_capture_is_active());
     struct input *input = input_from_wlr_input(&event->pointer->base);
     cursor_feed_axis(cursor, event->orientation, event->source,
                      input->state.scroll_factor * event->delta,
@@ -366,6 +389,9 @@ static void cursor_handle_axis(struct wl_listener *listener, void *data)
 static void cursor_handle_frame(struct wl_listener *listener, void *data)
 {
     struct cursor *cursor = wl_container_of(listener, cursor, frame);
+    if (input_capture_handle_frame()) {
+        return;
+    }
     if (!session_lock_is_active() && cursor->seat->pointer_grab) {
         return;
     }
@@ -717,17 +743,56 @@ void cursor_set_surface(struct cursor *cursor, struct wlr_surface *surface, int3
     wlr_cursor_set_surface(cursor->wlr_cursor, surface, hotspot_x, hotspot_y);
 }
 
-static void cursor_handle_request_set_cursor(struct wl_listener *listener, void *data)
+void cursor_set_client_xcursor(struct cursor *cursor, const char *name, struct wl_client *client)
 {
-    struct cursor *cursor = wl_container_of(listener, cursor, request_set_cursor);
-    struct wlr_seat_pointer_request_set_cursor_event *event = data;
+    /* a named shape replaces any client cursor surface tracked for xwayland */
+    if (cursor->surface) {
+        cursor_handle_surface_destroy(&cursor->surface_destroy, NULL);
+    }
+
+    /* use this to filter cursor image */
+    cursor->client_requested = true;
+    wlr_cursor_set_xcursor(cursor->wlr_cursor, cursor->xcursor_manager, name);
+}
+
+bool cursor_pointer_client_may_set_cursor(struct cursor *cursor, struct wlr_seat_client *seat_client)
+{
     struct wlr_seat_client *focused_client = cursor->seat->wlr_seat->pointer_state.focused_client;
     struct seat_pointer_grab *grab = cursor->seat->pointer_grab;
 
     if (cursor->image_locks > 0 || cursor->hidden) {
-        return;
+        return false;
     }
-    if ((!session_lock_is_active() && grab) || focused_client != event->seat_client) {
+    if ((!session_lock_is_active() && grab) || focused_client != seat_client) {
+        return false;
+    }
+    return true;
+}
+
+bool cursor_warp_to_surface(struct cursor *cursor, struct wlr_surface *surface, double sx,
+                            double sy)
+{
+    struct ky_scene_buffer *buffer = ky_scene_buffer_try_from_surface(surface);
+    if (!buffer) {
+        return false;
+    }
+
+    int lx, ly;
+    if (!ky_scene_node_coords(&buffer->node, &lx, &ly)) {
+        return false;
+    }
+
+    cursor_move(cursor, NULL, lx + sx, ly + sy, false, false);
+    cursor_feed_fake_motion(cursor, true);
+    return true;
+}
+
+static void cursor_handle_request_set_cursor(struct wl_listener *listener, void *data)
+{
+    struct cursor *cursor = wl_container_of(listener, cursor, request_set_cursor);
+    struct wlr_seat_pointer_request_set_cursor_event *event = data;
+
+    if (!cursor_pointer_client_may_set_cursor(cursor, event->seat_client)) {
         return;
     }
 

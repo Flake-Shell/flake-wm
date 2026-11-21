@@ -1,3 +1,10 @@
+flakewm (3.0.5-gxde1) lizhi; urgency=medium
+
+  * 新增Hyprland协议支持
+  * 新增FreeBSD 15支持
+
+ -- CharOfString <root@charofstring.cc>  Fri, 20 Nov 2026 07:56:17 -0600
+
 flakewm (3.0.4-gxde2) lizhi; urgency=medium
 
   * 新增对Gamma的支持

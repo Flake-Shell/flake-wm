@@ -541,6 +541,9 @@ static void shortcut_action(struct key_binding* binding, void* data) {
 }
 
 static void register_shortcut(const char* keybind, int* direction) {
+    if (kywc_key_binding_defaults_disabled()) {
+        return;
+    }
     struct key_binding* binding = kywc_key_binding_create(keybind, "switch windows");
     if (!binding) {
         return;

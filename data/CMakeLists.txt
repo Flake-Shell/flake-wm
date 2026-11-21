@@ -1,18 +1,24 @@
-install(FILES udev-rules/90-framebuffer.rules
-  DESTINATION /usr/lib/udev/rules.d
-  RENAME 90-flakewm-framebuffer.rules
-)
+# the fbdev backend's device permissions
+if(HAVE_FBDEV)
+  install(FILES udev-rules/90-framebuffer.rules
+    DESTINATION /usr/lib/udev/rules.d
+    RENAME 90-flakewm-framebuffer.rules
+  )
+endif()
 
-install(FILES gxde-flakewm.desktop
-  DESTINATION /usr/share/wayland-sessions
-)
+# the GXDE session runs startdde, there is no GXDE outside Linux
+if(WLCOM_GXDE_SESSION)
+  install(FILES gxde-flakewm.desktop
+    DESTINATION /usr/share/wayland-sessions
+  )
 
-install(PROGRAMS startflakewm
-  DESTINATION /usr/bin
-)
+  install(PROGRAMS startflakewm
+    DESTINATION /usr/bin
+  )
+endif()
 
 install(FILES config.json
-  DESTINATION /etc/flakewm
+  DESTINATION ${WLCOM_SYSCONFDIR}
 )
 
 set(GETTEXT_PACKAGE "${PROJECT_NAME}")

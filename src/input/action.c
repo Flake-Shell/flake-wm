@@ -32,6 +32,8 @@ enum action_type {
     ACTION_TYPE_RUN_COMMAND,
     ACTION_TYPE_SEND_BUTTON,
     ACTION_TYPE_SEND_KEY,
+    /* trigger a hyprland_global_shortcut_v1 registered as "app_id:id" */
+    ACTION_TYPE_GLOBAL_SHORTCUT,
 };
 
 enum key_action {
@@ -58,6 +60,10 @@ struct action_command_data {
     char *cmd;
 };
 
+struct action_global_data {
+    char *shortcut; /* app_id:id */
+};
+
 struct action_button_data {
     uint32_t val;
 };
@@ -82,6 +88,7 @@ struct action_data {
         struct action_button_data button;
         struct action_key_data key;
         struct action_command_data command;
+        struct action_global_data global;
     } data;
     const char *desc;
 };
@@ -222,6 +229,11 @@ static char *build_key_combo(uint32_t modifiers, xkb_keysym_t keysym)
 }
 
 /* returns true when the key was consumed by the active grab */
+bool input_action_is_grabbing(void)
+{
+    return grab_next_key;
+}
+
 bool input_action_handle_key(bool pressed, uint32_t modifiers, xkb_keysym_t keysym)
 {
     if (!grab_next_key) {
@@ -456,6 +468,37 @@ static int list_key_bindings(sd_bus_message *m, void *userdata, sd_bus_error *re
     return 1;
 }
 
+static bool append_global_shortcut(const char *app_id, const char *id, const char *description,
+                                   const char *trigger_description, void *data)
+{
+    struct list_key_bindings_context *context = data;
+    /* "app_id:id" is what an action of type global refers to */
+    char *shortcut = string_create("%s:%s", app_id, id);
+    context->error =
+        sd_bus_message_append(context->reply, "(sss)", shortcut, description, trigger_description);
+    free(shortcut);
+    return context->error < 0;
+}
+
+static int list_global_shortcuts(sd_bus_message *m, void *userdata, sd_bus_error *ret_error)
+{
+    sd_bus_message *reply = NULL;
+    CK(sd_bus_message_new_method_return(m, &reply));
+    CK(sd_bus_message_open_container(reply, 'a', "(sss)"));
+
+    struct list_key_bindings_context context = { .reply = reply, .error = 0 };
+    hyprland_global_shortcuts_for_each(append_global_shortcut, &context);
+    if (context.error < 0) {
+        sd_bus_message_unref(reply);
+        return context.error;
+    }
+
+    CK(sd_bus_message_close_container(reply));
+    CK(sd_bus_send(NULL, reply, NULL));
+    sd_bus_message_unref(reply);
+    return 1;
+}
+
 static struct action_data *action_data_create_from_bus_string(const char *bus_str)
 {
     struct action_data *action_data = NULL;
@@ -478,6 +521,8 @@ static struct action_data *action_data_create_from_bus_string(const char *bus_st
         action_data->type = ACTION_TYPE_SEND_BUTTON;
     } else if (strcmp(split_str[0], "key") == 0) {
         action_data->type = ACTION_TYPE_SEND_KEY;
+    } else if (strcmp(split_str[0], "global") == 0) {
+        action_data->type = ACTION_TYPE_GLOBAL_SHORTCUT;
     } else {
         action_data->type = ACTION_TYPE_NONE;
     }
@@ -503,6 +548,9 @@ static struct action_data *action_data_create_from_bus_string(const char *bus_st
     } else if (action_data->type == ACTION_TYPE_SEND_KEY && len == 3) {
         action_data->data.key.modifiers = keycodes_create(split_str[1]);
         action_data->data.key.keys = keycodes_create(split_str[2]);
+    } else if (action_data->type == ACTION_TYPE_GLOBAL_SHORTCUT && len == 2 &&
+               strchr(split_str[1], ':')) {
+        action_data->data.global.shortcut = strdup(split_str[1]);
     } else {
         free(action_data);
         action_data = NULL;
@@ -596,6 +644,11 @@ static void handle_input_action(struct input_action *input_action)
     case ACTION_TYPE_SEND_KEY:
         action_call_send_key(&action_data->data.key);
         break;
+    case ACTION_TYPE_GLOBAL_SHORTCUT:
+        /* a key binding is released later, a gesture has no key to release */
+        hyprland_global_shortcut_trigger(action_data->data.global.shortcut,
+                                         input_action->type == INPUT_TYPE_KEYBOARD);
+        break;
     default:
         break;
     }
@@ -623,6 +676,8 @@ static void input_action_destroy(struct input_action *input_action)
         free(input_action->action->data.dbus.method);
     } else if (input_action->action->type == ACTION_TYPE_RUN_COMMAND) {
         free(input_action->action->data.command.cmd);
+    } else if (input_action->action->type == ACTION_TYPE_GLOBAL_SHORTCUT) {
+        free(input_action->action->data.global.shortcut);
     } else if (input_action->action->type == ACTION_TYPE_SEND_KEY) {
         struct keycodes *modifiers = input_action->action->data.key.modifiers;
         struct keycodes *keys = input_action->action->data.key.keys;
@@ -735,6 +790,11 @@ static bool input_action_manager_write_config(struct input_action_manager *manag
             free(keystr);
         }
         break;
+    case ACTION_TYPE_GLOBAL_SHORTCUT:
+        json_object_object_add(action_config, "actiontype", json_object_new_string("global"));
+        json_object_object_add(action_config, "shortcut",
+                               json_object_new_string(action_data->data.global.shortcut));
+        break;
     default:
         break;
     }
@@ -770,6 +830,8 @@ static struct action_data *action_data_create_from_config(json_object *action_co
             type = ACTION_TYPE_SEND_BUTTON;
         } else if (strcmp(type_str, "key") == 0) {
             type = ACTION_TYPE_SEND_KEY;
+        } else if (strcmp(type_str, "global") == 0) {
+            type = ACTION_TYPE_GLOBAL_SHORTCUT;
         }
         action_data->type = type;
     }
@@ -821,6 +883,11 @@ static struct action_data *action_data_create_from_config(json_object *action_co
         if (json_object_object_get_ex(action_config, "keys", &data)) {
             const char *keys = json_object_get_string(data);
             action_data->data.key.keys = keycodes_create(keys);
+        }
+        break;
+    case ACTION_TYPE_GLOBAL_SHORTCUT:
+        if (json_object_object_get_ex(action_config, "shortcut", &data)) {
+            action_data->data.global.shortcut = strdup(json_object_get_string(data));
         }
         break;
     default:
@@ -988,7 +1055,8 @@ static int control_input_action(sd_bus_message *m, void *userdata, sd_bus_error 
         input_action_manager_write_config(manager, input_action);
         break;
     case CONTROL_TYPE_ENABLE:
-        if (input_action->action->enable) {
+        /* enabled but unbound when started with --no-default-keybind */
+        if (input_action->action->enable && input_action->data) {
             break;
         }
         if (input_action->type == INPUT_TYPE_KEYBOARD) {
@@ -1033,6 +1101,8 @@ static const sd_bus_vtable service_vtable[] = {
     SD_BUS_VTABLE_START(0),
     SD_BUS_METHOD("ListAllActions", "", "a(ss)", list_input_actions, 0),
     SD_BUS_METHOD("ListKeyBindings", "", "a(sss)", list_key_bindings, 0),
+    /* (app_id:id, description, preferred trigger) of hyprland global shortcuts */
+    SD_BUS_METHOD("ListGlobalShortcuts", "", "a(sss)", list_global_shortcuts, 0),
     SD_BUS_METHOD("AddAction", "sssss", "", add_input_action, 0),
     SD_BUS_METHOD("ControlAction", "ss", "", control_input_action, 0),
     SD_BUS_METHOD("GrabNextKey", "", "", grab_next_key_handler, 0),
@@ -1115,7 +1185,9 @@ static void input_action_create_with_keyboard(struct input_action_manager *manag
 
         wl_list_insert(&manager->actions, &input_action->link);
 
-        if (!action_data->enable) {
+        /* --no-default-keybind: keep the action listed but unbound, an
+         * "enable" through ControlAction binds it */
+        if (!action_data->enable || kywc_key_binding_defaults_disabled()) {
             continue;
         }
 
@@ -1127,7 +1199,7 @@ static void input_action_create_with_keyboard(struct input_action_manager *manag
         if (!kywc_key_binding_register(binding, action_data->binding_type,
                                        input_manager_keybinding_action, input_action)) {
             kywc_log(KYWC_DEBUG, "key_binding registion failed");
-            if (user) {
+            if (user && !manager->server->options.emergency_term_keybind) {
                 json_object_object_del(keyboard_obj, keybind);
             }
             kywc_key_binding_destroy(binding);

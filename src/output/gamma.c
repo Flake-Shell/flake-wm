@@ -277,14 +277,28 @@ static void interpolate_clolor(float a, const float *c1, const float *c2, float 
     c[2] = (1.0 - a) * c1[2] + a * c2[2];
 }
 
+/* the base ramp at x in [0, 1], interpolated */
+static double sample_ramp(const uint16_t *ramp, uint32_t ramp_size, double x)
+{
+    double pos = x * (ramp_size - 1);
+    uint32_t i = pos;
+    if (i >= ramp_size - 1) {
+        return (double)ramp[ramp_size - 1] / UINT16_MAX;
+    }
+    double t = pos - i;
+    return ((1.0 - t) * ramp[i] + t * ramp[i + 1]) / UINT16_MAX;
+}
+
 /**
  * Fill the ramp on top of base_ramp (the table of a wlr-gamma-control client,
  * or linear), then apply the per-channel gamma (xrandr convention, > 1.0 is
  * brighter), and finally the built-in color temperature and brightness.
+ * The per-channel ctm scales the input first, as a DRM CTM does before GAMMA_LUT.
  */
 static void fill_gamma_ramp_with_colortemp(uint16_t *gamma_ramp, uint32_t ramp_size,
-                                           const uint16_t *base_ramp, const float *gamma,
-                                           uint32_t color_temp, uint32_t brightness)
+                                           const uint16_t *base_ramp, const float *ctm,
+                                           const float *gamma, uint32_t color_temp,
+                                           uint32_t brightness)
 {
     /* approximate white point */
     float whitepoint[3];
@@ -303,9 +317,16 @@ static void fill_gamma_ramp_with_colortemp(uint16_t *gamma_ramp, uint32_t ramp_s
         if (gamma && output_gamma_is_valid(gamma[c])) {
             exponent = 1.0 / gamma[c];
         }
+        double scale = ctm ? ctm[c] : 1.0;
         for (uint32_t i = 0; i < ramp_size; i++) {
-            double value = base_ramp ? (double)base_ramp[c * ramp_size + i] / UINT16_MAX
-                                     : (double)i / ramp_size;
+            double value;
+            if (scale == 1.0) {
+                value = base_ramp ? (double)base_ramp[c * ramp_size + i] / UINT16_MAX
+                                  : (double)i / ramp_size;
+            } else {
+                double x = fmin(1.0, scale * i / (ramp_size - 1));
+                value = base_ramp ? sample_ramp(&base_ramp[c * ramp_size], ramp_size, x) : x;
+            }
             if (exponent != 1.0) {
                 value = pow(value, exponent);
             }
@@ -316,8 +337,8 @@ static void fill_gamma_ramp_with_colortemp(uint16_t *gamma_ramp, uint32_t ramp_s
 }
 
 bool output_set_gamma_lut(struct wlr_output *wlr_output, size_t gamma_size,
-                          struct wlr_output_state *wlr_state, const float *gamma,
-                          uint32_t color_temp, uint32_t brightness)
+                          struct wlr_output_state *wlr_state, const float *ctm,
+                          const float *gamma, uint32_t color_temp, uint32_t brightness)
 {
     /* A client may change the gamma base ramp, so keep night light mode over it. */
     struct wlr_gamma_control_v1 *control = output_get_gamma_control(wlr_output);
@@ -336,7 +357,7 @@ bool output_set_gamma_lut(struct wlr_output *wlr_output, size_t gamma_size,
     if (!gamma_ramp) {
         return false;
     }
-    fill_gamma_ramp_with_colortemp(gamma_ramp, gamma_size, base_ramp, gamma, color_temp,
+    fill_gamma_ramp_with_colortemp(gamma_ramp, gamma_size, base_ramp, ctm, gamma, color_temp,
                                    brightness);
     struct wlr_color_transform *transform = wlr_color_transform_init_lut_3x1d(
         gamma_size, gamma_ramp, gamma_ramp + gamma_size, gamma_ramp + 2 * gamma_size);
@@ -385,6 +406,25 @@ bool output_set_gamma(struct output *output, const float gamma[3])
         output->gamma_changed = true;
     }
     return true;
+}
+
+void output_set_ctm(struct output *output, const float ctm[3])
+{
+    if (output->ctm[0] == ctm[0] && output->ctm[1] == ctm[1] && output->ctm[2] == ctm[2]) {
+        return;
+    }
+
+    output->ctm[0] = ctm[0];
+    output->ctm[1] = ctm[1];
+    output->ctm[2] = ctm[2];
+    kywc_log(KYWC_DEBUG, "output:%s set ctm %.3f:%.3f:%.3f", output->base.name, ctm[0], ctm[1],
+             ctm[2]);
+
+    if (output->base.state.enabled) {
+        output_update_gamma(output);
+    } else {
+        output->gamma_changed = true;
+    }
 }
 
 /* wlr-gamma-control-unstable-v1, used by gammastep, wlsunset, etc. */

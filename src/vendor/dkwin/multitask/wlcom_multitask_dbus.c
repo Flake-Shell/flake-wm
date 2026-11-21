@@ -18,7 +18,6 @@
 #include <stdint.h>
 
 #include <kywc/log.h>
-#include <systemd/sd-bus.h>
 
 #include "util/dbus.h"
 #include "../../../view/view_p.h"

@@ -21,7 +21,11 @@ struct server {
         bool log_in_realtime;
         /* Mutual binding, living and dying together */
         bool binding_session;
-        /* Hyprland-compatible IPC sockets. */
+        /* --no-default-keybind: register no key bindings at startup */
+        bool no_default_keybind;
+        /* --emergency-term-keybind: Win+q opens a terminal */
+        bool emergency_term_keybind;
+        /* --hypr-unix-socket-sim-enable: Hyprland-compatible IPC sockets */
         bool enable_hypr_unix_socket_sim;
     } options;
 

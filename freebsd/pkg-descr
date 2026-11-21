@@ -1,0 +1,8 @@
+flakewm is the Wayland compositor of the GXDE desktop, based on
+kylin-wlcom and wlroots. It implements the common wlroots, KDE and UKUI
+protocols as well as the Hyprland private protocols (global shortcuts,
+toplevel export, input capture, focus grab and others), so desktop
+shells and tools written for those compositors work with it.
+
+The package contains the compositor and its client library
+(libflakewm-client). The GXDE session launcher is Linux only.
