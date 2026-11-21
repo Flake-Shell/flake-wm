@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+
+# SPDX-FileCopyrightText: CharOfString <root@charofstring.cc>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+# -----------------------------------------------------------------------------
+# 用当前源码树(含未提交的改动，不含 build/)构建 RPM，与 arch/PKGBUILD 一样
+# Build the RPMs from this checkout (working tree included, build/ left out),
+# like arch/PKGBUILD does. The tarball has the layout of the GitHub release
+# tarball named by Source0, so the spec builds either one unchanged.
+#
+# Usage: ./build-rpm [-d] [-s] [-c] [-- rpmbuild options]
+#   -d, --install-deps   install the BuildRequires with dnf builddep first
+#   -s, --srpm           only build the source RPM
+#   -c, --clean          remove fedora/rpmbuild and exit
+#   -h, --help           show this help
+# Results go to fedora/rpmbuild/{RPMS,SRPMS}; set RPMBUILD_TOPDIR to change it.
+
+set -euo pipefail
+
+# 本脚本与 build-deb 一样放在项目根目录 ・ Lives in the project root, next to build-deb.
+repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+spec="$repo_dir/fedora/flakewm.spec"
+topdir=${RPMBUILD_TOPDIR:-$repo_dir/fedora/rpmbuild}
+
+usage() {
+    sed -n '8,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    exit "${1:-0}"
+}
+
+install_deps=false
+mode=-ba
+while (($#)); do
+    case "$1" in
+        -d|--install-deps) install_deps=true; shift ;;
+        -s|--srpm) mode=-bs; shift ;;
+        -c|--clean) rm -rf "$topdir"; echo "removed $topdir"; exit 0 ;;
+        -h|--help) usage ;;
+        --) shift; break ;;
+        *) echo "unknown option: $1" >&2; usage 1 ;;
+    esac
+done
+
+for tool in rpmbuild rpmspec git tar; do
+    command -v "$tool" >/dev/null || { echo "missing $tool (dnf install rpm-build git-core tar)" >&2; exit 1; }
+done
+
+if $install_deps; then
+    # 不加 -y，确认将要安装的包 ・ No -y: check what dnf is about to install.
+    sudo dnf builddep "$spec"
+fi
+
+version=$(rpmspec -q --srpm --qf '%{VERSION}' "$spec")
+gxde_rev=$(sed -nE 's/^%global[[:space:]]+gxde_rev[[:space:]]+//p' "$spec")
+[[ -n $version && -n $gxde_rev ]] || { echo "cannot read Version/gxde_rev from $spec" >&2; exit 1; }
+tag="$version-$gxde_rev"
+
+mkdir -p "$topdir/SOURCES"
+tarball="$topdir/SOURCES/flake-wm-$tag.tar.gz"
+echo "packing $repo_dir -> $tarball"
+# 已删除但未提交删除的文件不打包 ・ Skip tracked files that were deleted in the working tree.
+git -C "$repo_dir" ls-files -z -co --exclude-standard |
+    while IFS= read -r -d '' f; do
+        [[ -e $repo_dir/$f || -L $repo_dir/$f ]] && printf '%s\0' "$f"
+    done |
+    tar -C "$repo_dir" --null -T - --transform "s,^,flake-wm-$tag/,S" \
+        --owner=0 --group=0 --numeric-owner -czf "$tarball"
+
+rpmbuild "$mode" --define "_topdir $topdir" "$@" "$spec"
+
+echo
+find "$topdir/RPMS" "$topdir/SRPMS" -name '*.rpm' -newer "$tarball" 2>/dev/null | sort

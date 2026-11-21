@@ -624,6 +624,14 @@ foreach(_variable IN LISTS _wlcom_cache_variables)
   endif()
 endforeach()
 
+# wlroots_external only builds the archive after this configure. Until it is on
+# disk, find_library() would settle on a system libwlroots-0.20.so (Arch's
+# wlroots0.20), which lacks symbols the compositor links against, e.g.
+# ext_workspace_handle_v1_interface. Name the vendored archive up front.
+set("pkgcfg_lib_WLCOM_WLROOTS_wlroots-0.20" "${WLROOTS_LIBRARY}" CACHE FILEPATH
+  "The vendored wlroots archive" FORCE
+)
+
 pkg_check_modules(WLCOM_WLROOTS REQUIRED IMPORTED_TARGET GLOBAL
   "wlroots-0.20=${WLROOTS_VERSION}"
 )

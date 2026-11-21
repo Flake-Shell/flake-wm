@@ -15,9 +15,9 @@
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see <https://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------------
-# 本脚本从debian/changelog中读取版本并且更新PKGBUILD的版本
+# 本脚本从debian/changelog中读取版本并且更新PKGBUILD与fedora/flakewm.spec的版本
 # This script reads version from debian/changelog and update the version of
-# PKGBUILD.
+# PKGBUILD and fedora/flakewm.spec.
 
 set -euo pipefail
 cd arch
@@ -50,9 +50,11 @@ usage() {
 
 pkgrel=
 version=
+from_changelog=
+pkgrel_opt=
 while (($#)); do
     case "$1" in
-        -r|--pkgrel) pkgrel=${2:?missing value for $1}; shift 2 ;;
+        -r|--pkgrel) pkgrel=${2:?missing value for $1}; pkgrel_opt=1; shift 2 ;;
         -h|--help) usage ;;
         -*) echo "unknown option: $1" >&2; usage 1 ;;
         *) version=$1; shift ;;
@@ -64,6 +66,7 @@ if [[ -z $version ]]; then
     version=$(sed -nE '1s/^[^ ]+ \(([^)]+)\).*/\1/p' "$changelog")
     [[ -n $version ]] || { echo "cannot parse version from $changelog" >&2; exit 1; }
     echo "version from debian/changelog: $version"
+    from_changelog=1
 fi
 
 # Debian "epoch:upstream-revision" -> Arch pkgver/pkgrel
@@ -96,4 +99,40 @@ bash -n "$pkgbuild"
 if command -v makepkg >/dev/null; then
     (cd "$script_dir" && makepkg --printsrcinfo >/dev/null)
     echo "PKGBUILD OK"
+fi
+
+# Fedora: Version/Release 同 pkgver/pkgrel，gxde_rev 是 git 标签的后缀
+# Fedora: Version/Release are pkgver/pkgrel, gxde_rev is the suffix of the git tag.
+spec="$repo_dir/fedora/flakewm.spec"
+if [[ -f $spec ]]; then
+    [[ -n $revision ]] || { echo "no Debian revision in $version, cannot name the git tag" >&2; exit 1; }
+    # gxde1, gxde2 要变成不同的 Release ・ gxde1 and gxde2 must give different Releases.
+    release=$pkgrel
+    if [[ -z $pkgrel_opt ]]; then
+        release=$(grep -oE '[0-9]+' <<<"$revision" | head -n1 || true)
+        release=${release:-1}
+    fi
+    old=$(grep -E '^(Version|Release):|^%global gxde_rev ' "$spec" | tr -s ' ' | paste -sd' ')
+    sed -i -E "s/^(Version:[[:space:]]+).*/\1$pkgver/; s/^(Release:[[:space:]]+)[^%]*/\1$release/;
+               s/^(%global gxde_rev ).*/\1$revision/" "$spec"
+    echo "$old -> Version: $pkgver Release: $release gxde_rev $revision"
+
+    # 把 debian/changelog 的第一条记录加进 %changelog ・ Add the first debian/changelog entry to %changelog.
+    if [[ -n $from_changelog ]] && ! grep -qE "^\* .* - ${pkgver//./\\.}-${release}\$" "$spec"; then
+        trailer=$(grep -m1 '^ -- ' "$changelog")
+        maintainer=${trailer# -- }
+        maintainer=${maintainer%%  *}
+        date=$(LC_ALL=C date -d "${trailer##*>  }" '+%a %b %d %Y')
+        entry=$(printf '* %s %s - %s-%s\n' "$date" "$maintainer" "$pkgver" "$release"
+                awk '/^ -- /{exit} /^  \* /{sub(/^  \* /, "- "); print; next}
+                     /^    [^ ]/{sub(/^    /, "  "); print}' "$changelog")
+        awk -v entry="$entry" '{print} /^%changelog$/{print entry; print ""}' "$spec" > "$spec.new"
+        mv "$spec.new" "$spec"
+        echo "%changelog: added $pkgver-$release"
+    fi
+
+    if command -v rpmspec >/dev/null; then
+        rpmspec -q --srpm "$spec" >/dev/null
+        echo "flakewm.spec OK"
+    fi
 fi

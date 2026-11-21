@@ -128,9 +128,17 @@ endforeach()
 
 add_link_options(LINKER:--as-needed)
 
+# Packages that have neither dpkg-parsechangelog nor a git checkout (RPM builds
+# from a tarball) pass their own version here.
+set(WLCOM_VERSION "" CACHE STRING
+  "Version to report, instead of the one from debian/changelog and git"
+)
+
 set(WLCOM_VERSION_STRING "${PROJECT_VERSION}")
 find_program(DPKG_PARSECHANGELOG_EXECUTABLE dpkg-parsechangelog)
-if(DPKG_PARSECHANGELOG_EXECUTABLE)
+if(WLCOM_VERSION)
+  set(WLCOM_VERSION_STRING "${WLCOM_VERSION}")
+elseif(DPKG_PARSECHANGELOG_EXECUTABLE)
   execute_process(
     COMMAND "${DPKG_PARSECHANGELOG_EXECUTABLE}" -SVersion
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
@@ -145,7 +153,7 @@ if(DPKG_PARSECHANGELOG_EXECUTABLE)
 endif()
 
 find_package(Git QUIET)
-if(GIT_FOUND)
+if(GIT_FOUND AND NOT WLCOM_VERSION)
   execute_process(
     COMMAND "${GIT_EXECUTABLE}" rev-parse --short=7 HEAD
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"

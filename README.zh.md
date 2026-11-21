@@ -305,6 +305,20 @@ $ sudo cmake --install build
 
 
 
+#### Fedora
+
+Spec文件位于[fedora/flakewm.spec](./fedora/flakewm.spec)，会构建`flakewm`、`flakewm-client`、`flakewm-client-devel`与`gxde-flake-session`。[./build-rpm](./build-rpm)把当前源码树(含未提交的改动，不含`build/`)打成spec需要的tarball，然后运行`rpmbuild`:
+
+```sh
+$ sudo dnf install rpm-build git-core
+$ ./build-rpm -d    # 先用dnf builddep安装构建依赖，再构建
+$ ./build-rpm       # 直接构建，RPM位于fedora/rpmbuild/RPMS
+```
+
+`-s`只构建源码包，`mock`或Copr可以用它从`Source0`指向的发布tarball构建。[update-pkgver](./update-pkgver)在更新PKGBUILD的同时，按`debian/changelog`同步`Version`、`Release`与`%changelog`。
+
+
+
 #### 手动编辑 (构建脚本)
 
 构建脚本位于[./build-deb](./build-deb), 这是个shell脚本，用于在调试时生成安装包，便于在调试机器上轻松部署与卸载。

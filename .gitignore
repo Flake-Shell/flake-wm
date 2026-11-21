@@ -705,6 +705,8 @@ Makefile*
 # the FreeBSD port
 !/freebsd/Makefile
 *build-*
+# the Fedora package build script
+!/build-rpm
 *.qm
 *.prl
 
@@ -818,6 +820,8 @@ $RECYCLE.BIN/
 /debian/flakewm/
 /debian/flakewm-client/
 /debian/tmp/
+# RPM build output of build-rpm
+/fedora/rpmbuild/
 
 # ---> Agents
 # Code Agents

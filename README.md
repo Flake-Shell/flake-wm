@@ -311,6 +311,20 @@ The system-wide defaults are installed to `/usr/local/etc/flakewm/config.json`. 
 
 
 
+#### Fedora
+
+The spec file lives in [fedora/flakewm.spec](./fedora/flakewm.spec) and builds `flakewm`, `flakewm-client`, `flakewm-client-devel` and `gxde-flake-session`. [./build-rpm](./build-rpm) packs this checkout (uncommitted changes included, `build/` left out) into the tarball the spec expects and runs `rpmbuild`:
+
+```sh
+$ sudo dnf install rpm-build git-core
+$ ./build-rpm -d    # install the BuildRequires with dnf builddep, then build
+$ ./build-rpm       # build only, the RPMs go to fedora/rpmbuild/RPMS
+```
+
+`-s` only builds the source RPM, which `mock` or Copr can build from the release tarball named by `Source0`. [update-pkgver](./update-pkgver) syncs `Version`, `Release` and `%changelog` with `debian/changelog`, together with the PKGBUILD.
+
+
+
 #### Manual build (build script)
 
 The build script is located at [./build-deb](./build-deb). It is a shell script used to generate install packages during debugging, making it easy to deploy and uninstall on a debugging machine.
