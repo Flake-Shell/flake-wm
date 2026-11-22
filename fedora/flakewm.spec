@@ -4,13 +4,13 @@
 
 # Version/Release/gxde_rev 由 update-pkgver 从 debian/changelog 同步 ・ update-pkgver keeps
 # Version, Release and gxde_rev in step with debian/changelog.
-%global gxde_rev gxde1
+%global gxde_rev gxde2
 # git 标签与 Debian 版本号相同，例如 3.0.5-gxde1 ・ The git tag is the Debian version, e.g. 3.0.5-gxde1.
 %global tag %{version}-%{gxde_rev}
 
 Name:           flakewm
 Version:        3.0.6
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        GXDE Wayland compositor
 
 License:        BSD-3-Clause AND GPL-1.0-or-later AND GPL-2.0-or-later AND GPL-3.0-or-later AND LGPL-2.1-or-later AND MIT AND MIT-CMU AND MulanPSL-2.0
@@ -180,6 +180,9 @@ fi
 %{_datadir}/wayland-sessions/gxde-flakewm.desktop
 
 %changelog
+* Sun Nov 22 2026 CharOfString <root@charofstring.cc> - 3.0.6-2
+- 修复FreeBSD 15构建
+
 * Sat Nov 21 2026 CharOfString <root@charofstring.cc> - 3.0.6-1
 - 支持部分HyprCtl控制
 

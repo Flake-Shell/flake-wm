@@ -1,3 +1,9 @@
+flakewm (3.0.6-gxde2) lizhi; urgency=medium
+
+  * 修复FreeBSD 15构建
+
+ -- CharOfString <root@charofstring.cc>  Sun, 22 Nov 2026 01:36:41 -0600
+
 flakewm (3.0.6-gxde1) lizhi; urgency=medium
 
   * 支持部分HyprCtl控制
