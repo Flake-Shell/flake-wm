@@ -112,16 +112,6 @@ void emergency_term_binding_create(struct input_manager *input_manager);
 /* hyprland_global_shortcuts_manager_v1, see hyprland_global_shortcuts.c */
 bool hyprland_global_shortcuts_create(struct input_manager *input_manager);
 
-bool hyprland_global_shortcut_trigger(const char *target, bool from_key);
-
-typedef bool (*hyprland_global_shortcut_iterator_func_t)(const char *app_id, const char *id,
-                                                         const char *description,
-                                                         const char *trigger_description,
-                                                         void *data);
-
-void hyprland_global_shortcuts_for_each(hyprland_global_shortcut_iterator_func_t iterator,
-                                        void *data);
-
 /* hyprland_focus_grab_manager_v1, see hyprland_focus_grab.c */
 bool hyprland_focus_grab_manager_create(struct input_manager *input_manager);
 

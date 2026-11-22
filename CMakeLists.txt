@@ -41,6 +41,7 @@ option(WLCOM_EXAMPLES "Build example applications" ON)
 option(WLCOM_LIBKYWC "Build libkywc for client" ON)
 option(WLCOM_TRACY "Enable tracy profiler" OFF)
 option(WLCOM_GXDE_SESSION "Install the GXDE session launcher (startflakewm)" ON)
+option(WLCOM_FLAKECTL "Build flakectl (Hyprland's hyprctl) for the Hyprland-compatible IPC" ON)
 set(WLCOM_EXTRA_ICON_PATH "" CACHE STRING "Add extra icon path")
 set(WLCOM_EXTRA_APPS_PATH "" CACHE STRING "Add extra apps path")
 
@@ -314,6 +315,10 @@ endif()
 add_subdirectory(data)
 add_subdirectory(protocols)
 add_subdirectory(src)
+
+if(WLCOM_FLAKECTL)
+  add_subdirectory(tools/flakectl)
+endif()
 
 if(WLCOM_LIBKYWC)
   add_subdirectory(libkywc)

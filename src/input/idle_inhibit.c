@@ -36,6 +36,22 @@ struct idle_inhibitor {
     bool visible;
 };
 
+static struct idle_inhibit_manager *idle_inhibit_manager = NULL;
+
+bool idle_inhibit_view_is_inhibiting(struct view *view)
+{
+    if (!idle_inhibit_manager || !view) {
+        return false;
+    }
+    struct idle_inhibitor *inhibitor;
+    wl_list_for_each(inhibitor, &idle_inhibit_manager->idle_inhibitors, link) {
+        if (inhibitor->view == view) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void idle_inhibitor_set_inhibit(struct idle_inhibitor *idle_inhibitor)
 {
     if (idle_inhibitor->visible) {
@@ -160,6 +176,9 @@ static void handle_destroy(struct wl_listener *listener, void *data)
     struct idle_inhibit_manager *manager = wl_container_of(listener, manager, destroy);
     wl_list_remove(&manager->destroy.link);
     wl_list_remove(&manager->new_idle_inhibitor.link);
+    if (idle_inhibit_manager == manager) {
+        idle_inhibit_manager = NULL;
+    }
     free(manager);
 }
 
@@ -179,5 +198,6 @@ bool idle_inhibit_manager_create(struct server *server)
     manager->destroy.notify = handle_destroy;
     wl_signal_add(&manager->idle_inhibit->events.destroy, &manager->destroy);
 
+    idle_inhibit_manager = manager;
     return true;
 }

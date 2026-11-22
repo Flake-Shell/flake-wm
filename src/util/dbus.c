@@ -519,6 +519,81 @@ void dbus_notify(const char *name, const char *summary, const char *body, const 
                              summary, body, 0, 0, 5000);
 }
 
+struct notify_reply {
+    void (*done)(uint32_t id, void *data);
+    void *data;
+};
+
+static int handle_notify_reply(sd_bus_message *m, void *userdata, sd_bus_error *ret_error)
+{
+    struct notify_reply *reply = userdata;
+    uint32_t id = 0;
+    if (!sd_bus_message_is_method_error(m, NULL)) {
+        if (sd_bus_message_read(m, "u", &id) < 0) {
+            id = 0;
+        }
+    }
+    if (reply->done) {
+        reply->done(id, reply->data);
+    }
+    free(reply);
+    return 0;
+}
+
+void dbus_notify_full(const char *name, const char *summary, const char *body, const char *icon,
+                      int32_t timeout, uint8_t urgency, uint32_t replaces_id,
+                      void (*done)(uint32_t id, void *data), void *data)
+{
+    struct notify_reply *reply = calloc(1, sizeof(*reply));
+    if (!reply) {
+        goto fail;
+    }
+    reply->done = done;
+    reply->data = data;
+
+    if (!context || !context->user) {
+        goto fail;
+    }
+
+    sd_bus_message *m = NULL;
+    int ret = sd_bus_message_new_method_call(context->user, &m, "org.freedesktop.Notifications",
+                                             "/org/freedesktop/Notifications",
+                                             "org.freedesktop.Notifications", "Notify");
+    if (ret >= 0) {
+        ret = sd_bus_message_append(m, "susssas", name, replaces_id, icon ? icon : "", summary,
+                                    body, 0);
+    }
+    if (ret >= 0) {
+        ret = sd_bus_message_append(m, "a{sv}", 1, "urgency", "y", urgency);
+    }
+    if (ret >= 0) {
+        ret = sd_bus_message_append(m, "i", timeout);
+    }
+    if (ret >= 0) {
+        ret = sd_bus_call_async(context->user, NULL, m, handle_notify_reply, reply, 0);
+    }
+    sd_bus_message_unref(m);
+    if (ret >= 0) {
+        return;
+    }
+
+fail:
+    free(reply);
+    if (done) {
+        done(0, data);
+    }
+}
+
+void dbus_close_notification(uint32_t id)
+{
+    if (!context || !context->user || id == 0) {
+        return;
+    }
+    sd_bus_call_method_async(context->user, NULL, "org.freedesktop.Notifications",
+                             "/org/freedesktop/Notifications", "org.freedesktop.Notifications",
+                             "CloseNotification", NULL, NULL, "u", id);
+}
+
 int dbus_add_match(const char *match, sd_bus_message_handler_t callback, void *data)
 {
     if (!context || !context->user) {

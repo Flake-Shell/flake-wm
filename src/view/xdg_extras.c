@@ -10,9 +10,9 @@
  *   with wlr_xdg_toplevel_set_parent(), which reaches view_set_parent() through
  *   the toplevel set_parent signal in xdg_shell.c.
  * - xdg_system_bell_v1: there is no sound or attention feedback to drive yet,
- *   the request is accepted and logged.
- * - xdg_toplevel_tag_manager_v1: tags and descriptions are logged, nothing
- *   matches on them yet.
+ *   the request is logged and reported as the Hyprland IPC bell event.
+ * - xdg_toplevel_tag_manager_v1: tags and descriptions are logged and shown as
+ *   xdgTag/xdgDescription by the Hyprland IPC, nothing matches on them yet.
  */
 
 #include <stdlib.h>
@@ -24,6 +24,7 @@
 #include <wlr/types/wlr_xdg_system_bell_v1.h>
 #include <wlr/types/wlr_xdg_toplevel_tag_v1.h>
 
+#include "view/hyprland_ipc.h"
 #include "view_p.h"
 
 #define XDG_SYSTEM_BELL_VERSION 1
@@ -49,6 +50,7 @@ static void handle_bell_ring(struct wl_listener *listener, void *data)
     wl_client_get_credentials(event->client, &pid, NULL, NULL);
     kywc_log(KYWC_DEBUG, "system bell rung by client(pid=%d)%s", pid,
              event->surface ? " for a surface" : "");
+    hyprland_ipc_bell(event->surface);
 }
 
 static void handle_bell_destroy(struct wl_listener *listener, void *data)
@@ -67,6 +69,7 @@ static void handle_set_tag(struct wl_listener *listener, void *data)
     }
     kywc_log(KYWC_DEBUG, "toplevel(app_id=%s) tag set to %s",
              event->toplevel->app_id ? event->toplevel->app_id : "", event->tag);
+    hyprland_ipc_toplevel_tag(event->toplevel->base->surface, event->tag, NULL);
 }
 
 static void handle_set_description(struct wl_listener *listener, void *data)
@@ -78,6 +81,7 @@ static void handle_set_description(struct wl_listener *listener, void *data)
     }
     kywc_log(KYWC_DEBUG, "toplevel(app_id=%s) description set to %s",
              event->toplevel->app_id ? event->toplevel->app_id : "", event->description);
+    hyprland_ipc_toplevel_tag(event->toplevel->base->surface, NULL, event->description);
 }
 
 static void handle_tag_destroy(struct wl_listener *listener, void *data)

@@ -45,6 +45,7 @@ static struct wl_event_source *child_source;
 enum {
     OPT_NO_DEFAULT_KEYBIND = 0x100,
     OPT_EMERGENCY_TERM_KEYBIND,
+    OPT_HYPR_UNIX_SOCKET_SIM,
 };
 
 static const struct option long_options[] = {
@@ -55,6 +56,7 @@ static const struct option long_options[] = {
     { "verbose", no_argument, NULL, 'V' },
     { "no-default-keybind", no_argument, NULL, OPT_NO_DEFAULT_KEYBIND },
     { "emergency-term-keybind", no_argument, NULL, OPT_EMERGENCY_TERM_KEYBIND },
+    { "hypr-unix-socket-sim-enable", no_argument, NULL, OPT_HYPR_UNIX_SOCKET_SIM },
     { 0, 0, 0, 0 },
 };
 
@@ -73,6 +75,9 @@ static const char usage[] =
     "                           KGlobalAccel) still work.\n"
     "      --emergency-term-keybind\n"
     "                           Bind Win+q to open a terminal.\n"
+    "      --hypr-unix-socket-sim-enable\n"
+    "                           Serve Hyprland-compatible IPC sockets and export\n"
+    "                           HYPRLAND_INSTANCE_SIGNATURE (off by default).\n"
     "\n";
 
 static bool detect_suid(void)
@@ -328,6 +333,9 @@ int main(int argc, char *argv[])
             break;
         case OPT_EMERGENCY_TERM_KEYBIND:
             server.options.emergency_term_keybind = true;
+            break;
+        case OPT_HYPR_UNIX_SOCKET_SIM:
+            server.options.enable_hypr_unix_socket_sim = true;
             break;
         default:
             fprintf(stderr, "%s", usage);

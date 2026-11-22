@@ -25,6 +25,8 @@ struct server {
         bool no_default_keybind;
         /* --emergency-term-keybind: Win+q opens a terminal */
         bool emergency_term_keybind;
+        /* --hypr-unix-socket-sim-enable: Hyprland-compatible IPC sockets */
+        bool enable_hypr_unix_socket_sim;
     } options;
 
     struct {
@@ -57,6 +59,7 @@ struct server {
     /* create for the virtual output */
     struct wlr_backend *headless_backend;
     struct wlr_compositor *compositor;
+    struct wlr_content_type_manager_v1 *content_type_manager;
 
     struct ky_scene *scene;
     struct ky_scene_output_layout *scene_layout;

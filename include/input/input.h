@@ -162,6 +162,26 @@ void input_rebase_all_cursor(void);
 
 void input_set_all_cursor(const char *cursor_theme, uint32_t cursor_size);
 
+typedef bool (*input_iterator_func_t)(struct input *input, void *data);
+/* every input device, stops when the iterator returns true */
+void input_manager_for_each_input(input_iterator_func_t iterator, void *data);
+
+struct view;
+/* an idle inhibitor is attached to one of the view's surfaces */
+bool idle_inhibit_view_is_inhibiting(struct view *view);
+
+/* hyprland_global_shortcuts_manager_v1 registrations, stops when the iterator returns true */
+typedef bool (*hyprland_global_shortcut_iterator_func_t)(const char *app_id, const char *id,
+                                                         const char *description,
+                                                         const char *trigger_description,
+                                                         void *data);
+
+void hyprland_global_shortcuts_for_each(hyprland_global_shortcut_iterator_func_t iterator,
+                                        void *data);
+
+/* press and release "app_id:id", false if no such shortcut is registered */
+bool hyprland_global_shortcut_trigger(const char *target, bool from_key);
+
 void seat_add_new_listener(struct wl_listener *listener);
 
 /* destroy_func can be NULL */

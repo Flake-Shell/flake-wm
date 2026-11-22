@@ -4,3 +4,51 @@ Upstream-Contact: chenlinxiang@kylinos.cn
 Files: *
 Copyright: 2023, KylinSoft Co., Ltd.
 License: GPL-1.0-or-later
+
+Files: tools/flakectl/hyprland/*
+Copyright: 2022-2026, vaxerski
+License: BSD-3-Clause
+Comment: hyprctl from Hyprland v0.57.2, see tools/flakectl/README.md.
+ Installed as /usr/bin/flakectl, which links GNU readline and is therefore
+ distributed under GPL-3.0-or-later as a whole.
+
+Files: tools/flakectl/hyprutils/*
+Copyright: 2024, Hypr Development
+License: BSD-3-Clause
+Comment: Parts of hyprutils v0.14.3 used by hyprctl.
+
+Files: tools/flakectl/hyprpaper_stub.cpp
+ tools/flakectl/CMakeLists.txt
+ tools/flakectl/README.md
+Copyright: 2026, CharOfString <root@charofstring.cc>
+License: GPL-3.0-or-later
+
+License: BSD-3-Clause
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are met:
+ .
+ 1. Redistributions of source code must retain the above copyright notice, this
+    list of conditions and the following disclaimer.
+ .
+ 2. Redistributions in binary form must reproduce the above copyright notice,
+    this list of conditions and the following disclaimer in the documentation
+    and/or other materials provided with the distribution.
+ .
+ 3. Neither the name of the copyright holder nor the names of its
+    contributors may be used to endorse or promote products derived from
+    this software without specific prior written permission.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+License: GPL-3.0-or-later
+ On Debian systems, the complete text of the GNU General Public License
+ version 3 can be found in "/usr/share/common-licenses/GPL-3".

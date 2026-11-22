@@ -15,9 +15,13 @@
  * with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+#define _POSIX_C_SOURCE 200809L
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <string.h>
 #include <time.h>
 
 #include <drm_fourcc.h>
@@ -31,6 +35,7 @@
 #include "output.h"
 #include "scene/thumbnail.h"
 #include "server.h"
+#include "view/hyprland_ipc.h"
 #include "view/view.h"
 #include "ext-foreign-toplevel-list-v1-protocol.h"
 #include "ext-image-capture-source-v1-protocol.h"
@@ -68,6 +73,10 @@ struct ext_capture_session {
     pixman_region32_t damage;
     uint32_t options;
     bool stopped;
+
+    /* reported to the Hyprland IPC as a screencast */
+    enum hyprland_ipc_share_type share_type;
+    char *share_name;
 };
 
 struct ext_capture_source {
@@ -542,6 +551,8 @@ static void session_maybe_destroy(struct ext_capture_session *session)
         return;
     }
     struct ext_capture_source *source = session->source;
+    hyprland_ipc_screencast(false, session->share_type, session->share_name);
+    free(session->share_name);
     wl_list_remove(&session->link);
     pixman_region32_fini(&session->damage);
     free(session);
@@ -630,6 +641,24 @@ static struct ext_capture_session *session_create(struct ext_capture_source *sou
     wl_resource_set_implementation(resource, &session_impl, session,
                                    session_handle_resource_destroy);
     session_send_constraints(session);
+
+    const char *name = NULL;
+    switch (source->kind) {
+    case EXT_SOURCE_OUTPUT:
+        session->share_type = HYPRLAND_IPC_SHARE_MONITOR;
+        name = source->target.output ? source->target.output->base.name : NULL;
+        break;
+    case EXT_SOURCE_TOPLEVEL:
+        session->share_type = HYPRLAND_IPC_SHARE_WINDOW;
+        name = source->target.view ? source->target.view->base.title : NULL;
+        break;
+    case EXT_SOURCE_WORKSPACE:
+        session->share_type = HYPRLAND_IPC_SHARE_WORKSPACE;
+        name = source->target.workspace ? source->target.workspace->name : NULL;
+        break;
+    }
+    session->share_name = strdup(name ? name : "");
+    hyprland_ipc_screencast(true, session->share_type, session->share_name);
     return session;
 }
 
