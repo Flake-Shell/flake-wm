@@ -1,3 +1,4 @@
+bin/flakectl
 bin/flakewm
 @sample %%ETCDIR%%/config.json.sample
 include/flakewm/libkywc.h

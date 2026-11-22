@@ -8,24 +8,8 @@ run-name: Building ${{ github.repository }} for FreeBSD
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
     tags:
       - "*"
-    paths-ignore: &ignored
-      - "**.md"
-      - "docs/**"
-      - "arch/**"
-      - "debian/**"
-      - "fedora/**"
-      - "build-deb"
-      - "build-rpm"
-  pull_request:
-    paths-ignore: *ignored
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   freebsd:

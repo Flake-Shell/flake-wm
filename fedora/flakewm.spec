@@ -13,7 +13,7 @@ Version:        3.0.6
 Release:        1%{?dist}
 Summary:        GXDE Wayland compositor
 
-License:        GPL-1.0-or-later AND GPL-2.0-or-later AND GPL-3.0-or-later AND LGPL-2.1-or-later AND MIT AND MIT-CMU AND MulanPSL-2.0
+License:        BSD-3-Clause AND GPL-1.0-or-later AND GPL-2.0-or-later AND GPL-3.0-or-later AND LGPL-2.1-or-later AND MIT AND MIT-CMU AND MulanPSL-2.0
 URL:            https://github.com/Flake-Shell/flake-wm
 # ./build-rpm 从本地源码树生成同名 tarball ・ ./build-rpm makes the same tarball from a checkout.
 Source0:        %{url}/archive/%{tag}/flake-wm-%{tag}.tar.gz
@@ -23,6 +23,8 @@ ExclusiveArch:  x86_64 aarch64
 
 BuildRequires:  cmake >= 3.21
 BuildRequires:  gcc
+# flakectl (Hyprland's hyprctl) is C++26 ・ flakectl is C++26.
+BuildRequires:  gcc-c++
 BuildRequires:  gettext
 BuildRequires:  glslang
 BuildRequires:  meson >= 1.3.0
@@ -52,6 +54,8 @@ BuildRequires:  pkgconfig(openssl)
 BuildRequires:  pkgconfig(pango)
 BuildRequires:  pkgconfig(pangocairo)
 BuildRequires:  pkgconfig(pixman-1)
+BuildRequires:  pkgconfig(re2)
+BuildRequires:  pkgconfig(readline)
 BuildRequires:  pkgconfig(vulkan) >= 1.2.182
 BuildRequires:  pkgconfig(wayland-client)
 BuildRequires:  pkgconfig(wayland-protocols) >= 1.41
@@ -116,6 +120,9 @@ Display manager session that starts the GXDE desktop on flakewm.
 
 %prep
 %autosetup -n flake-wm-%{tag}
+# 两份都叫 LICENSE，%license 需要不同的文件名 ・ Both are named LICENSE, %license needs distinct names.
+cp -p tools/flakectl/hyprland/LICENSE LICENSE.hyprland
+cp -p tools/flakectl/hyprutils/LICENSE LICENSE.hyprutils
 
 %build
 # 选项与 debian/rules 相同；依赖固定为 enabled，缺了就报错而不是悄悄关掉功能
@@ -148,7 +155,9 @@ fi
 %files -f %{name}.files
 %license LICENSE LICENSES/GPL-1.0-or-later.txt LICENSES/LGPL-2.1-or-later.txt
 %license LICENSES/MIT-CMU.txt LICENSES/MulanPSL-2.0.txt
+%license LICENSE.hyprland LICENSE.hyprutils
 %doc README.md README.zh.md
+%{_bindir}/flakectl
 %{_bindir}/flakewm
 %dir %{_sysconfdir}/flakewm
 %config(noreplace) %{_sysconfdir}/flakewm/config.json

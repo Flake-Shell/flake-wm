@@ -12,13 +12,20 @@ MAINTAINER=	root@charofstring.cc
 COMMENT=	GXDE Wayland compositor
 WWW=		https://github.com/Flake-Shell/flake-wm
 
-LICENSE=	GPLv1+ GPLv2+ GPLv3+ LGPL21+ MIT MITCMU MULANPSL2
+# flakectl is Hyprland's hyprctl with parts of hyprutils, both BSD-3-Clause with
+# their own copyright lines. HYPRUTILS only carries the second notice.
+LICENSE=	BSD3CLAUSE GPLv1+ GPLv2+ GPLv3+ HYPRUTILS LGPL21+ MIT MITCMU \
+		MULANPSL2
 LICENSE_COMB=	multi
+LICENSE_NAME_HYPRUTILS=	BSD 3-Clause License (hyprutils, used by flakectl)
 LICENSE_NAME_MITCMU=	CMU License
 LICENSE_NAME_MULANPSL2=	Mulan Permissive Software License, Version 2
+LICENSE_FILE_BSD3CLAUSE=	${WRKSRC}/tools/flakectl/hyprland/LICENSE
 LICENSE_FILE_GPLv3+ =	${WRKSRC}/LICENSE
+LICENSE_FILE_HYPRUTILS=	${WRKSRC}/tools/flakectl/hyprutils/LICENSE
 LICENSE_FILE_MITCMU=	${WRKSRC}/LICENSES/MIT-CMU.txt
 LICENSE_FILE_MULANPSL2=	${WRKSRC}/LICENSES/MulanPSL-2.0.txt
+LICENSE_PERMS_HYPRUTILS=	dist-mirror dist-sell pkg-mirror pkg-sell auto-accept
 LICENSE_PERMS_MITCMU=	dist-mirror dist-sell pkg-mirror pkg-sell auto-accept
 LICENSE_PERMS_MULANPSL2=	dist-mirror dist-sell pkg-mirror pkg-sell auto-accept
 
@@ -36,6 +43,8 @@ LIB_DEPENDS=	libbasu.so:devel/basu \
 		libjson-c.so:devel/json-c \
 		libudev.so:devel/libudev-devd \
 		libunwind.so:devel/libunwind \
+		libre2.so:devel/re2 \
+		libreadline.so:devel/readline \
 		libdrm.so:graphics/libdrm \
 		libepoxy.so:graphics/libepoxy \
 		liblcms2.so:graphics/lcms2 \
@@ -49,8 +58,9 @@ LIB_DEPENDS=	libbasu.so:devel/basu \
 		libinput.so:x11/libinput \
 		libxkbcommon.so:x11/libxkbcommon
 
-USES=		cmake compiler:c11 gl gnome jpeg pathfix pkgconfig python:build \
-		ssl xorg
+# flakectl asks CMake for C++26, c++23-lang is the newest the framework knows
+USES=		cmake compiler:c++23-lang gl gnome jpeg pathfix pkgconfig \
+		python:build ssl xorg
 USE_GL=		egl gbm glesv2
 USE_GNOME=	cairo glib20 librsvg2 pango
 USE_XORG=	pixman xcb
