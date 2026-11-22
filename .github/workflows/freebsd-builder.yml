@@ -4,6 +4,7 @@ run-name: Building ${{ github.repository }} for FreeBSD
 # 在 FreeBSD 虚拟机里用 freebsd/ 下的 port 构建这个 checkout，依赖全部来自 pkg
 # Builds this checkout with the port in freebsd/ inside a FreeBSD VM. Every
 # dependency comes from pkg, nothing but flakewm is built from source.
+# 打标签时把包上传到该标签的 release ・ On a tag the package goes to that tag's release.
 
 on:
   workflow_dispatch:
@@ -16,6 +17,8 @@ jobs:
     name: FreeBSD ${{ matrix.release }} amd64
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -70,8 +73,14 @@ jobs:
             make check-plist
             make package
 
+            # flakewm-3.0.6_1.pkg -> flakewm-3.0.6_1-freebsd15-amd64.pkg, next to the
+            # .deb and Arch packages in the release
             mkdir -p "$src/freebsd-pkg"
-            cp work/pkg/*.pkg "$src/freebsd-pkg/"
+            major=$(freebsd-version -u | cut -d. -f1)
+            for f in work/pkg/*.pkg; do
+                cp "$f" "$src/freebsd-pkg/$(basename "$f" .pkg)-freebsd$major-$(uname -m).pkg"
+            done
+            ls -l "$src/freebsd-pkg"
             pkg info -F "$src"/freebsd-pkg/*.pkg | head -n 20
 
       - uses: actions/upload-artifact@v7
@@ -79,3 +88,19 @@ jobs:
           name: flakewm-freebsd${{ matrix.release }}-amd64
           path: freebsd-pkg/*.pkg
           if-no-files-found: error
+
+      # 正式标题由人来起，这里只在 release 还不存在时用标签名建一个
+      # Releases are titled by hand; one named after the tag is made only if none exists.
+      - name: Upload to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+              # another workflow may create it at the same moment
+              gh release create "$TAG" --verify-tag --title "$TAG" --notes "" ||
+                  gh release view "$TAG" >/dev/null
+          fi
+          gh release upload "$TAG" freebsd-pkg/*.pkg --clobber
