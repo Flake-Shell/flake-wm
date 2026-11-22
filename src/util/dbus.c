@@ -536,7 +536,7 @@ static int handle_notify_reply(sd_bus_message *m, void *userdata, sd_bus_error *
     if (reply->done) {
         reply->done(id, reply->data);
     }
-    free(reply);
+    /* freed by the slot's destroy callback, also when the bus goes away first */
     return 0;
 }
 
@@ -569,11 +569,15 @@ void dbus_notify_full(const char *name, const char *summary, const char *body, c
     if (ret >= 0) {
         ret = sd_bus_message_append(m, "i", timeout);
     }
+    sd_bus_slot *slot = NULL;
     if (ret >= 0) {
-        ret = sd_bus_call_async(context->user, NULL, m, handle_notify_reply, reply, 0);
+        ret = sd_bus_call_async(context->user, &slot, m, handle_notify_reply, reply, 0);
     }
     sd_bus_message_unref(m);
     if (ret >= 0) {
+        sd_bus_slot_set_destroy_callback(slot, free);
+        sd_bus_slot_set_floating(slot, 1);
+        sd_bus_slot_unref(slot);
         return;
     }
 

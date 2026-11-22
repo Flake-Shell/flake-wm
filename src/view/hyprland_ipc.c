@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <math.h>
 #include <regex.h>
 #include <signal.h>
@@ -71,6 +72,9 @@
 #define HYPR_MAX_REQUEST (64 * 1024)
 #define HYPR_MAX_REQUEST_CLIENTS 32
 #define HYPR_MAX_SUBSCRIBERS 64
+#define HYPR_MAX_LOG_FOLLOWERS 16
+/* Lua coordinates and sizes are clamped to this, so sums with geometry stay in int */
+#define HYPR_LUA_COORD_MAX (1 << 24)
 /* drop an event subscriber that stops reading once this much is queued */
 #define HYPR_MAX_EVENT_BACKLOG (1024 * 1024)
 #define HYPR_REQUEST_TIMEOUT_MS 5000
@@ -2070,6 +2074,10 @@ static bool parse_offset(const char *s, long *value)
     if (!end || *end) {
         return false;
     }
+    /* clamped, so "current + offset" and "index + offset" cannot overflow */
+    if (v > INT_MAX) {
+        v = INT_MAX;
+    }
     *value = s[0] == '-' ? -v : v;
     return true;
 }
@@ -3221,6 +3229,7 @@ static bool lp_table(struct lparser *lp, struct lval *v, int depth)
         }
         if (!lp_value(lp, &field.val, depth + 1)) {
             free(field.key);
+            lval_finish(&field.val);
             return false;
         }
         struct lfield *fields = realloc(v->fields, (v->nfields + 1) * sizeof(*fields));
@@ -3315,6 +3324,7 @@ static bool lp_call(struct lparser *lp, const char *prefix, char **path, struct 
     while (true) {
         struct lval value;
         if (!lp_value(lp, &value, 0)) {
+            lval_finish(&value);
             return false;
         }
         struct lfield *fields = realloc(args->fields, (args->nfields + 1) * sizeof(*fields));
@@ -3349,6 +3359,17 @@ static struct lval *lfield(struct lval *table, const char *key)
         }
     }
     return NULL;
+}
+
+/* Lua numbers come from strtod: nan/inf are rejected, the rest truncated and clamped */
+static bool lnum_int(const struct lval *v, int lo, int hi, int *out)
+{
+    if (!v || v->type != LVAL_NUM || !isfinite(v->num)) {
+        return false;
+    }
+    double d = trunc(v->num);
+    *out = d < lo ? lo : d > hi ? hi : (int)d;
+    return true;
 }
 
 /* argStr: strings as they are, numbers like Lua prints them */
@@ -4230,8 +4251,9 @@ static const char *lua_window_dispatch(struct hypr_ipc *ipc, const char *name, s
     } else if (!strcmp(name, "kill")) {
         window_force_kill(ipc, view);
     } else if (!strcmp(name, "signal")) {
-        struct lval *sig = lfield(opts, "signal");
-        return window_signal(view, sig && sig->type == LVAL_NUM ? (int)sig->num : 0);
+        int sig = 0;
+        lnum_int(lfield(opts, "signal"), INT_MIN, INT_MAX, &sig);
+        return window_signal(view, sig);
     } else if (!strcmp(name, "float")) {
         int set = lval_toggle(opts, kv->tiled == KYWC_TILE_NONE);
         window_set_floating(view, set);
@@ -4268,29 +4290,32 @@ static const char *lua_window_dispatch(struct hypr_ipc *ipc, const char *name, s
     } else if (!strcmp(name, "move")) {
         struct lval *ws_sel = lfield(opts, "workspace");
         struct lval *x = lfield(opts, "x"), *y = lfield(opts, "y");
+        int ix, iy;
         if (ws_sel) {
             struct workspace *ws = workspace_by_selector(ipc, lval_str(ws_sel, buf));
             if (!ws) {
                 return "Invalid workspace";
             }
             window_move_to(ipc, view, ws, lval_bool(lfield(opts, "follow"), true));
-        } else if (x && y && x->type == LVAL_NUM && y->type == LVAL_NUM) {
+        } else if (lnum_int(x, -HYPR_LUA_COORD_MAX, HYPR_LUA_COORD_MAX, &ix) &&
+                   lnum_int(y, -HYPR_LUA_COORD_MAX, HYPR_LUA_COORD_MAX, &iy)) {
             bool relative = lval_bool(lfield(opts, "relative"), false);
-            int nx = (int)x->num + (relative ? kv->geometry.x : 0);
-            int ny = (int)y->num + (relative ? kv->geometry.y : 0);
+            int nx = ix + (relative ? kv->geometry.x : 0);
+            int ny = iy + (relative ? kv->geometry.y : 0);
             kywc_view_move(kv, nx, ny);
         } else {
             return "flakewm does not tile, cannot move in a direction";
         }
     } else if (!strcmp(name, "resize")) {
-        struct lval *x = lfield(opts, "x"), *y = lfield(opts, "y");
-        if (!x || !y || x->type != LVAL_NUM || y->type != LVAL_NUM) {
+        int ix, iy;
+        if (!lnum_int(lfield(opts, "x"), -HYPR_LUA_COORD_MAX, HYPR_LUA_COORD_MAX, &ix) ||
+            !lnum_int(lfield(opts, "y"), -HYPR_LUA_COORD_MAX, HYPR_LUA_COORD_MAX, &iy)) {
             return "resize needs x and y";
         }
         bool relative = lval_bool(lfield(opts, "relative"), false);
         struct kywc_box box = kv->geometry;
-        box.width = (int)x->num + (relative ? box.width : 0);
-        box.height = (int)y->num + (relative ? box.height : 0);
+        box.width = ix + (relative ? box.width : 0);
+        box.height = iy + (relative ? box.height : 0);
         if (box.width <= 0 || box.height <= 0) {
             return "Invalid size";
         }
@@ -4393,7 +4418,8 @@ static const char *lua_dispatch(struct hypr_ipc *ipc, const char *path, struct l
     }
     if (!strcmp(path, "cursor.move")) {
         struct lval *x = lfield(opts, "x"), *y = lfield(opts, "y");
-        if (!x || !y || x->type != LVAL_NUM || y->type != LVAL_NUM) {
+        if (!x || !y || x->type != LVAL_NUM || y->type != LVAL_NUM || !isfinite(x->num) ||
+            !isfinite(y->num)) {
             return "cursor.move needs x and y";
         }
         move_cursor(x->num, y->num);
@@ -4406,7 +4432,8 @@ static const char *lua_dispatch(struct hypr_ipc *ipc, const char *path, struct l
             return "No such window found";
         }
         /* 0 bottom left, 1 bottom right, 2 top right, 3 top left */
-        int c = corner && corner->type == LVAL_NUM ? (int)corner->num : 0;
+        int c = 0;
+        lnum_int(corner, INT_MIN, INT_MAX, &c);
         struct kywc_box *g = &win->view->base.geometry;
         move_cursor(g->x + (c == 1 || c == 2 ? g->width - 1 : 0),
                     g->y + (c == 0 || c == 1 ? g->height - 1 : 0));
@@ -4995,7 +5022,8 @@ static void request_process(struct hypr_request *req)
         request_destroy(req);
         return;
     }
-    if (follow) {
+    /* past the limit the client gets the snapshot only, like a plain rollinglog */
+    if (follow && wl_list_length(&req->ipc->log_followers) < HYPR_MAX_LOG_FOLLOWERS) {
         request_follow(req);
     }
     request_write(req);
@@ -5059,7 +5087,7 @@ static int handle_request_fd(int fd, uint32_t mask, void *data)
 static int handle_request_timeout(void *data)
 {
     struct hypr_request *req = data;
-    req->timer = NULL;
+    /* request_destroy removes the timer, which is fine from its own callback */
     request_destroy(req);
     return 0;
 }
