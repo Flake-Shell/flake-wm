@@ -1,3 +1,12 @@
+flakewm (3.0.5-gxde2) lizhi; urgency=medium
+
+  * 修复首次登录后第一次拖拽崩溃：cursor->hover.node 为 NULL 时
+    xwayland_start_drag_x11() 解引用导致 SIGSEGV；现在先判空，并回退到
+    拖拽源窗口自己的 surface
+  * wlr_surface_try_from_node() 对 NULL 节点返回 NULL 作为兜底
+
+ -- shenmo <shenmo@spark-app.store>  Sun, 22 Nov 2026 08:25:00 +0800
+
 flakewm (3.0.5-gxde1) lizhi; urgency=medium
 
   * 新增Hyprland协议支持

@@ -405,7 +405,8 @@ struct ky_scene_surface *ky_scene_surface_create(struct ky_scene_tree *parent,
 
 struct wlr_surface *wlr_surface_try_from_node(struct ky_scene_node *node)
 {
-    if (node->type != KY_SCENE_NODE_BUFFER) {
+    /* "try" 系列对无效节点应返回 NULL，很多调用方会直接传 cursor->hover.node */
+    if (!node || node->type != KY_SCENE_NODE_BUFFER) {
         return NULL;
     }
 
