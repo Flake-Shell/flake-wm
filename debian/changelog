@@ -1,3 +1,9 @@
+flakewm (3.0.6-gxde3) lizhi; urgency=medium
+
+  * FreeBSD构建产物自动上传到GitHub Release
+
+ -- CharOfString <root@charofstring.cc>  Sun, 22 Nov 2026 03:34:44 -0600
+
 flakewm (3.0.6-gxde2) lizhi; urgency=medium
 
   * 修复FreeBSD 15构建
