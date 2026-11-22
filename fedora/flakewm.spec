@@ -9,7 +9,7 @@
 %global tag %{version}-%{gxde_rev}
 
 Name:           flakewm
-Version:        3.0.5
+Version:        3.0.6
 Release:        1%{?dist}
 Summary:        GXDE Wayland compositor
 
@@ -171,6 +171,9 @@ fi
 %{_datadir}/wayland-sessions/gxde-flakewm.desktop
 
 %changelog
+* Sat Nov 21 2026 CharOfString <root@charofstring.cc> - 3.0.6-1
+- 支持部分HyprCtl控制
+
 * Fri Nov 20 2026 CharOfString <root@charofstring.cc> - 3.0.5-1
 - 新增Hyprland协议支持
 - 新增FreeBSD 15支持

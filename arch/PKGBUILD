@@ -1,7 +1,7 @@
 # Maintainer: CharOfString <root@charofstring.cc>
 pkgbase=flakewm
 pkgname=('flakewm' 'flakewm-client' 'gxde-flake-session')
-pkgver=3.0.5
+pkgver=3.0.6
 pkgrel=1
 pkgdesc='GXDE Wayland compositor'
 arch=('x86_64' 'aarch64')

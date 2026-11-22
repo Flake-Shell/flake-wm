@@ -1,3 +1,9 @@
+flakewm (3.0.6-gxde1) lizhi; urgency=medium
+
+  * 支持部分HyprCtl控制
+
+ -- CharOfString <root@charofstring.cc>  Sat, 21 Nov 2026 23:10:38 -0600
+
 flakewm (3.0.5-gxde2) lizhi; urgency=medium
 
   * 修复首次登录后第一次拖拽崩溃：cursor->hover.node 为 NULL 时

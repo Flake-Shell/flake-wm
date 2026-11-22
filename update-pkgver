@@ -15,12 +15,14 @@
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see <https://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------------
-# 本脚本从debian/changelog中读取版本并且更新PKGBUILD与fedora/flakewm.spec的版本
+# 本脚本从debian/changelog中读取版本并且更新arch/PKGBUILD、fedora/flakewm.spec
+# 与freebsd/Makefile的版本
 # This script reads version from debian/changelog and update the version of
-# PKGBUILD and fedora/flakewm.spec.
+# arch/PKGBUILD, fedora/flakewm.spec and freebsd/Makefile.
+#
+# usage: update-pkgver [-r PKGREL] [VERSION]
 
 set -euo pipefail
-cd arch
 
 # 引用/Works Cited: https://patorjk.com/software/taag/#p=display&f=Linguaholic+Shadow+3D
 echo '  ██████╗██╗     ██╗██████╗  ████████╗           ████╗                     '
@@ -38,13 +40,14 @@ echo '██╔═══██║██╔═╝    ██║      ██║   �
 echo '██║   ██║██║      ╚═██████╗██║   ██║████████╗██║██║   ██║╚═██████║██╔═══██╗'
 echo '╚═╝   ╚═╝╚═╝        ╚═════╝╚═╝   ╚═╝╚═══════╝╚═╝╚═╝   ╚═╝  ╚═════╝╚═╝   ╚═╝'
 
-script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-repo_dir=$(dirname "$script_dir")
-pkgbuild="$script_dir/PKGBUILD"
+# 脚本在仓库根目录，从哪里调用都行 ・ The script lives in the repo root and works from any directory.
+repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+arch_dir="$repo_dir/arch"
+pkgbuild="$arch_dir/PKGBUILD"
 changelog="$repo_dir/debian/changelog"
 
 usage() {
-    sed -n '2,8p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    sed -n '/^# 本脚本/,/^# usage:/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
     exit "${1:-0}"
 }
 
@@ -97,21 +100,24 @@ echo "$old -> pkgver=$pkgver pkgrel=$pkgrel"
 
 bash -n "$pkgbuild"
 if command -v makepkg >/dev/null; then
-    (cd "$script_dir" && makepkg --printsrcinfo >/dev/null)
+    (cd "$arch_dir" && makepkg --printsrcinfo >/dev/null)
     echo "PKGBUILD OK"
+fi
+
+# Fedora 与 FreeBSD 都从 git 标签 <版本>-<修订> 取源码，需要 Debian 修订号
+# Fedora and FreeBSD fetch the git tag <version>-<revision>, so a Debian revision is needed.
+[[ -n $revision ]] || { echo "no Debian revision in $version, cannot name the git tag" >&2; exit 1; }
+# gxde1, gxde2 要变成不同的发行号 ・ gxde1 and gxde2 must give different releases.
+release=$pkgrel
+if [[ -z $pkgrel_opt ]]; then
+    release=$(grep -oE '[0-9]+' <<<"$revision" | head -n1 || true)
+    release=${release:-1}
 fi
 
 # Fedora: Version/Release 同 pkgver/pkgrel，gxde_rev 是 git 标签的后缀
 # Fedora: Version/Release are pkgver/pkgrel, gxde_rev is the suffix of the git tag.
 spec="$repo_dir/fedora/flakewm.spec"
 if [[ -f $spec ]]; then
-    [[ -n $revision ]] || { echo "no Debian revision in $version, cannot name the git tag" >&2; exit 1; }
-    # gxde1, gxde2 要变成不同的 Release ・ gxde1 and gxde2 must give different Releases.
-    release=$pkgrel
-    if [[ -z $pkgrel_opt ]]; then
-        release=$(grep -oE '[0-9]+' <<<"$revision" | head -n1 || true)
-        release=${release:-1}
-    fi
     old=$(grep -E '^(Version|Release):|^%global gxde_rev ' "$spec" | tr -s ' ' | paste -sd' ')
     sed -i -E "s/^(Version:[[:space:]]+).*/\1$pkgver/; s/^(Release:[[:space:]]+)[^%]*/\1$release/;
                s/^(%global gxde_rev ).*/\1$revision/" "$spec"
@@ -134,5 +140,35 @@ if [[ -f $spec ]]; then
     if command -v rpmspec >/dev/null; then
         rpmspec -q --srpm "$spec" >/dev/null
         echo "flakewm.spec OK"
+    fi
+fi
+
+# FreeBSD: DISTVERSION 同 pkgver，DISTVERSIONSUFFIX 补全 git 标签；修订号不进包版本，
+# 所以 gxdeN 写成 PORTREVISION=N-1
+# FreeBSD: DISTVERSION is pkgver and DISTVERSIONSUFFIX completes the git tag. The suffix
+# is not part of the package version, so gxdeN becomes PORTREVISION=N-1.
+port="$repo_dir/freebsd/Makefile"
+if [[ -f $port ]]; then
+    grep -qE '^DISTVERSION=' "$port" && grep -qE '^DISTVERSIONSUFFIX=' "$port" ||
+        { echo "$port has no DISTVERSION/DISTVERSIONSUFFIX line" >&2; exit 1; }
+    portrevision=$((${release%%.*} - 1))
+    old=$(grep -E '^(DISTVERSION|DISTVERSIONSUFFIX|PORTREVISION)=' "$port" | tr -s '\t ' ' ' | paste -sd' ')
+    # PORTREVISION 紧跟在 DISTVERSIONSUFFIX 后，为 0 时省略 ・ PORTREVISION follows
+    # DISTVERSIONSUFFIX and is left out when it is 0.
+    awk -v ver="$pkgver" -v suffix="-$revision" -v rev="$portrevision" '
+        /^PORTREVISION=/ { next }
+        /^DISTVERSION=/ { print "DISTVERSION=\t" ver; next }
+        /^DISTVERSIONSUFFIX=/ {
+            print "DISTVERSIONSUFFIX=\t" suffix
+            if (rev > 0) print "PORTREVISION=\t" rev
+            next
+        }
+        { print }' "$port" > "$port.new"
+    mv "$port.new" "$port"
+    new="DISTVERSION= $pkgver DISTVERSIONSUFFIX= -$revision"
+    ((portrevision > 0)) && new+=" PORTREVISION= $portrevision"
+    echo "$old -> $new"
+    if [[ -f $repo_dir/freebsd/distinfo ]]; then
+        echo "freebsd/distinfo is stale now, run 'make makesum' in the port on FreeBSD" >&2
     fi
 fi
