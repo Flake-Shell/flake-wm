@@ -1,0 +1,97 @@
+name: Building FreeBSD Package
+run-name: Building ${{ github.repository }} for FreeBSD
+
+# 在 FreeBSD 虚拟机里用 freebsd/ 下的 port 构建这个 checkout，依赖全部来自 pkg
+# Builds this checkout with the port in freebsd/ inside a FreeBSD VM. Every
+# dependency comes from pkg, nothing but flakewm is built from source.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - "*"
+    paths-ignore: &ignored
+      - "**.md"
+      - "docs/**"
+      - "arch/**"
+      - "debian/**"
+      - "fedora/**"
+      - "build-deb"
+      - "build-rpm"
+  pull_request:
+    paths-ignore: *ignored
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  freebsd:
+    name: FreeBSD ${{ matrix.release }} amd64
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        # "15" is the newest 15.x the action ships
+        release: ["15"]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the port
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: ${{ matrix.release }}
+          sync: rsync
+          copyback: true
+          prepare: |
+            set -eu
+            freebsd-version
+            sysctl -n hw.ncpu hw.physmem
+            env ASSUME_ALWAYS_YES=yes pkg update -f
+            pkg install -y git-tiny
+            # the workspace is owned by the runner's uid, not root
+            git config --system --add safe.directory '*'
+
+            # ports tree from the branch the packages were built from, so that
+            # the versions the port asks for match what pkg installs
+            if pkg -vv | grep -qE 'url *: *"[^"]*/latest"'; then
+                branch=main
+            else
+                month=$(date -u +%m)
+                branch=$(date -u +%Y)Q$(( (${month#0} - 1) / 3 + 1 ))
+                git ls-remote --exit-code --heads https://git.FreeBSD.org/ports.git "$branch" >/dev/null ||
+                    branch=main
+            fi
+            echo "ports branch: $branch"
+            rm -rf /usr/ports
+            git clone --quiet --depth 1 --single-branch -b "$branch" \
+                https://git.FreeBSD.org/ports.git /usr/ports
+
+          run: |
+            set -eu
+            src=$PWD
+            port=/usr/ports/x11-wm/flakewm
+            rm -rf "$port"
+            cp -R freebsd "$port"
+            cd "$port"
+
+            # BATCH: no prompts; DEVELOPER: stage runs stage-qa and fails on QA errors
+            export BATCH=yes DEVELOPER=yes FLAKEWM_SRC="$src"
+            make install-missing-packages
+            make stage
+            make check-plist
+            make package
+
+            mkdir -p "$src/freebsd-pkg"
+            cp work/pkg/*.pkg "$src/freebsd-pkg/"
+            pkg info -F "$src"/freebsd-pkg/*.pkg | head -n 20
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: flakewm-freebsd${{ matrix.release }}-amd64
+          path: freebsd-pkg/*.pkg
+          if-no-files-found: error
