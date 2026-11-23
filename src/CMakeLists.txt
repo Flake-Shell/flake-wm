@@ -575,3 +575,89 @@ if(WLCOM_PRIVATE_LIBDIR)
     "${CMAKE_INSTALL_PREFIX}/${WLCOM_PRIVATE_LIBDIR}")
   set_property(TARGET flakewm PROPERTY INSTALL_RPATH "\$ORIGIN/${_wlcom_private_lib_rel}")
 endif()
+
+# shell/gxde/kwin_shim
+#
+# A Qt shim that stands in for the parts of KWin the gxde-kwin QML frontends
+# (shell/gxde/window_switcher) use, backed by flakewm through libkywc.
+if(WLCOM_LIBKYWC)
+  # thumbnail_item uses <qpa/...>. Qt >= 6.9 ships the private module as its
+  # own package, older releases create Qt6::GuiPrivate along with Qt6::Gui.
+  find_package(Qt6 QUIET COMPONENTS Core DBus Gui Quick Qml
+    OPTIONAL_COMPONENTS GuiPrivate
+  )
+  if(Qt6_FOUND AND TARGET Qt6::GuiPrivate)
+    pkg_check_modules(KWIN_SHIM_DEPS REQUIRED IMPORTED_TARGET
+      egl glesv2 libdrm
+    )
+
+    qt6_add_resources(kwin_shim_resources shell/gxde/kwin_shim/resources.qrc)
+
+    add_library(occultation-exoskeleton STATIC
+      shell/gxde/kwin_shim/exoskeleton/exoskeleton.cc
+      shell/gxde/kwin_shim/exoskeleton/exoskeleton.h
+      shell/gxde/kwin_shim/icon_item/icon_item.cc
+      shell/gxde/kwin_shim/icon_item/icon_item.h
+      shell/gxde/kwin_shim/registration/registration.cc
+      shell/gxde/kwin_shim/switcher_item/switcher_item.cc
+      shell/gxde/kwin_shim/switcher_item/switcher_item.h
+      shell/gxde/kwin_shim/switcher_model/switcher_model.cc
+      shell/gxde/kwin_shim/switcher_model/switcher_model.h
+      shell/gxde/kwin_shim/thumbnail_item/thumbnail_item.cc
+      shell/gxde/kwin_shim/thumbnail_item/thumbnail_item.h
+      ${kwin_shim_resources}
+    )
+    set_target_properties(occultation-exoskeleton PROPERTIES AUTOMOC ON)
+    target_compile_options(occultation-exoskeleton PUBLIC -Wno-unused-parameter)
+    target_include_directories(occultation-exoskeleton PUBLIC
+      "${PROJECT_SOURCE_DIR}"
+    )
+    target_link_libraries(occultation-exoskeleton PUBLIC
+      Qt6::Core
+      Qt6::DBus
+      Qt6::Gui
+      Qt6::GuiPrivate
+      Qt6::Quick
+      Qt6::Qml
+      kywc
+      PkgConfig::KWIN_SHIM_DEPS
+    )
+
+    add_executable(occultation-qml-smoke EXCLUDE_FROM_ALL
+      shell/gxde/kwin_shim/smoke/smoke.cc
+    )
+    target_link_libraries(occultation-qml-smoke PRIVATE occultation-exoskeleton)
+
+    add_executable(occultation-switcher-preview EXCLUDE_FROM_ALL
+      shell/gxde/kwin_shim/preview/preview.cc
+      shell/gxde/kwin_shim/preview_model/preview_model.cc
+      shell/gxde/kwin_shim/preview_model/preview_model.h
+      shell/gxde/kwin_shim/preview_switcher/preview_switcher.cc
+      shell/gxde/kwin_shim/preview_switcher/preview_switcher.h
+      shell/gxde/kwin_shim/preview_thumbnail_item/preview_thumbnail_item.cc
+      shell/gxde/kwin_shim/preview_thumbnail_item/preview_thumbnail_item.h
+    )
+    set_target_properties(occultation-switcher-preview PROPERTIES AUTOMOC ON)
+    target_link_libraries(occultation-switcher-preview PRIVATE
+      occultation-exoskeleton
+    )
+
+    # occultation-qml-smoke is not built by default; build it on demand before
+    # the test runs.
+    add_test(NAME occultation-qml-smoke-build
+      COMMAND "${CMAKE_COMMAND}" --build "${CMAKE_BINARY_DIR}"
+        --target occultation-qml-smoke --config $<CONFIG>
+    )
+    set_tests_properties(occultation-qml-smoke-build PROPERTIES
+      FIXTURES_SETUP occultation-qml-smoke-binary
+    )
+    add_test(NAME occultation-qml-smoke COMMAND occultation-qml-smoke)
+    set_tests_properties(occultation-qml-smoke PROPERTIES
+      LABELS occultation
+      FIXTURES_REQUIRED occultation-qml-smoke-binary
+      ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software"
+    )
+  else()
+    message(WARNING "Qt 6 Quick was not found; the KWin shim will not be built")
+  endif()
+endif()

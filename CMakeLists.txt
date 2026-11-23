@@ -322,7 +322,6 @@ endif()
 
 if(WLCOM_LIBKYWC)
   add_subdirectory(libkywc)
-  add_subdirectory(project_occultation/exoskeleton)
 endif()
 
 if(WLCOM_EXAMPLES)
