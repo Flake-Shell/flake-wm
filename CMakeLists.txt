@@ -23,7 +23,7 @@ endforeach()
 include(GNUInstallDirs)
 include(CheckCCompilerFlag)
 include(CheckLanguage)
-include(cmake/WlcomHelpers.cmake)
+include(cmake/wlcom_helpers.cmake)
 
 set(WLCOM_PLUGIN_DIRECTORY
   "" CACHE STRING

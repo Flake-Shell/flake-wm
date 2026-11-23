@@ -4,7 +4,7 @@
 not patches. These files carry the compositor-specific behaviour inherited from
 `open-kylin-wlroots@950dbeb6`.
 
-The old 0.17 build used `cmake/PrepareWlroots.cmake` to overlay these files on a
+The old 0.17 build used `cmake/prepare_wlroots.cmake` to overlay these files on a
 build-directory copy of the official sources. That mechanism is **not used by
 the current 0.20.2 build**: `libs/wlroots` is compiled without modifications.
 
