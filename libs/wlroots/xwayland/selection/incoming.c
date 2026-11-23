@@ -466,6 +466,11 @@ void xwm_handle_selection_notify(struct wlr_xwm *xwm,
 			xwm_selection_transfer_destroy(transfer);
 		}
 	} else if (event->target == xwm->atoms[TARGETS]) {
+		if (selection->owner == selection->window) {
+			wlr_log(WLR_DEBUG, "ignoring stale TARGETS reply: we own the selection");
+			return;
+		}
+
 		// No xwayland surface focused, deny access to clipboard
 		if (xwm->focus_surface == NULL) {
 			wlr_log(WLR_DEBUG, "denying write access to clipboard: "
@@ -524,6 +529,27 @@ int xwm_handle_xfixes_selection_notify(struct wlr_xwm *xwm,
 		// grab the actual timestamp here so we can answer TIMESTAMP conversion
 		// requests correctly.
 		selection->timestamp = event->timestamp;
+
+		// The stale TARGETS reply may have arrived before this notify and
+		// already put an Xwayland source on the seat. That source belongs to
+		// an X11 client which no longer owns the selection, and reading it would
+		// only convert the selection back to ourselves. Drop it, which also
+		// releases our X11 ownership.
+		struct wlr_seat *seat = xwm->seat;
+		if (seat != NULL && selection == &xwm->clipboard_selection &&
+				seat->selection_source != NULL &&
+				data_source_is_xwayland(seat->selection_source)) {
+			wlr_log(WLR_INFO, "dropping stale Xwayland clipboard source");
+			wlr_seat_request_set_selection(seat, NULL, NULL,
+				wl_display_next_serial(xwm->xwayland->wl_display));
+		} else if (seat != NULL && selection == &xwm->primary_selection &&
+				seat->primary_selection_source != NULL &&
+				primary_selection_source_is_xwayland(
+					seat->primary_selection_source)) {
+			wlr_log(WLR_INFO, "dropping stale Xwayland primary selection source");
+			wlr_seat_request_set_primary_selection(seat, NULL, NULL,
+				wl_display_next_serial(xwm->xwayland->wl_display));
+		}
 		return 1;
 	}
 

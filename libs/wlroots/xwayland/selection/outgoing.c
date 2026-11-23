@@ -405,6 +405,18 @@ void xwm_handle_selection_request(struct wlr_xwm *xwm,
 		goto fail_notify_requestor;
 	}
 
+	// The requestor is one of our own incoming transfer windows: the Wayland
+	// selection is an Xwayland source while we also own the X11 selection.
+	// Forwarding would ask the Xwayland source again, which converts the
+	// selection again and lands right back here, forever (leaking a pipe and
+	// a window per round trip).
+	if (xwm_selection_find_incoming_transfer_by_window(selection,
+			req->requestor) != NULL) {
+		wlr_log(WLR_ERROR, "refusing selection request from our own incoming "
+			"transfer window %u", req->requestor);
+		goto fail_notify_requestor;
+	}
+
 	if (selection->window != req->owner) {
 		if (req->time != XCB_CURRENT_TIME && req->time < selection->timestamp) {
 			wlr_log(WLR_DEBUG, "ignored old request from timestamp %d; expected > %d",

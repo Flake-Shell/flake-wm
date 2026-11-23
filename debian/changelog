@@ -1,3 +1,9 @@
+flakewm (3.0.6-gxde4) lizhi; urgency=medium
+
+  * 修复XWayland剪切板导致WM冻结的问题
+
+ -- CharOfString <root@charofstring.cc>  Mon, 23 Nov 2026 02:03:00 -0600
+
 flakewm (3.0.6-gxde3) lizhi; urgency=medium
 
   * FreeBSD构建产物自动上传到GitHub Release
