@@ -18,7 +18,7 @@
 include_guard(GLOBAL)
 
 set(WLCOM_CAPTURE_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/capture.cmake")
-set(WLCOM_EMBED_SCRIPT "${PROJECT_SOURCE_DIR}/data/embed.sh")
+set(WLCOM_EMBED_SCRIPT "${PROJECT_SOURCE_DIR}/data/scripts/embed.sh")
 
 # Make the headers <outputs>, all generated into <dir>, a dependency of
 # <target> and <dir> an include dir of <target>.
@@ -41,9 +41,9 @@ endfunction()
 # wlcom_embed_files(<target> [SUFFIX <suffix>] FILES <file>...)
 #
 # Turn each file into a C header holding `static const char <name><suffix>[]`
-# with data/embed.sh, where <name> is the file name with every character that
-# is not valid in a C identifier replaced by '_' (blur.vert -> blur_vert). The
-# header is called <name><suffix>.h. Files are relative to the current source
+# with data/scripts/embed.sh, where <name> is the file name with every
+# character that is not valid in a C identifier replaced by '_'
+# (blur.vert -> blur_vert). The header is called <name><suffix>.h. Files are relative to the current source
 # dir and must all be in one directory; the headers go to the matching
 # directory under the current binary dir, which becomes an include dir.
 function(wlcom_embed_files target)

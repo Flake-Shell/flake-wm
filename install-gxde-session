@@ -122,7 +122,7 @@ if [ "$action" = uninstall ]; then
     exit 0
 fi
 
-[ -r "$source_dir/startflakewm" ] && [ -r "$source_dir/gxde-flakewm.desktop" ] ||
+[ -r "$source_dir/scripts/startflakewm" ] && [ -r "$source_dir/entries/gxde-flakewm.desktop" ] ||
     die "session files not found in $source_dir"
 
 if [ -z "$destdir" ]; then
@@ -144,10 +144,10 @@ tmp_dir=$(mktemp -d)
 trap 'rm -rf "$tmp_dir"' EXIT
 
 sed "s|/usr/bin/flakewm\\b|$bin_dir/flakewm|g" \
-    "$source_dir/startflakewm" >"$tmp_dir/startflakewm"
+    "$source_dir/scripts/startflakewm" >"$tmp_dir/startflakewm"
 sed -e "s|^Exec=/usr/bin/startflakewm\$|Exec=$startflakewm|" \
     -e "s|^TryExec=/usr/bin/flakewm\$|TryExec=$bin_dir/flakewm|" \
-    "$source_dir/gxde-flakewm.desktop" >"$tmp_dir/gxde-flakewm.desktop"
+    "$source_dir/entries/gxde-flakewm.desktop" >"$tmp_dir/gxde-flakewm.desktop"
 
 install -Dm755 "$tmp_dir/startflakewm" "$destdir$startflakewm"
 printf 'installed %s\n' "$destdir$startflakewm"

@@ -420,7 +420,7 @@ The `-D` argument allows convenient runtime debugging. The supported options are
 
 ~~See "[./docs/gxde/flakewm-session.md](./docs/gxde/depreciated/flakewm-session.md)" to learn how to set up a kywc session on GXDE.~~
 
-flakewm now automatically installs the session file when installing the `.deb` package, so manual installation is no longer needed. The related `.desktop` file and startup script can be found under `data/` in this repo.
+flakewm now automatically installs the session file when installing the `.deb` package, so manual installation is no longer needed. The related `.desktop` file and startup script can be found under `data/entries/` and `data/scripts/` in this repo.
 
 
 

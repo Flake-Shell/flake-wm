@@ -312,7 +312,7 @@ if(HAVE_NLS)
   add_subdirectory(po)
 endif()
 
-add_subdirectory(data)
+include(cmake/data.cmake)
 add_subdirectory(protocols)
 add_subdirectory(src)
 

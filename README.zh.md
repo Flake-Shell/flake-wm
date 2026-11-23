@@ -414,7 +414,7 @@ Usage: kylin-wlcom [options] [command]
 
 ~~请参阅「[./docs/gxde/flakewm-session.md](./docs/gxde/depreciated/flakewm-session.md)」，了解如何在GXDE上建立kywc会话。~~
 
-现在flakewm会在安装`.deb`包时自动安装会话文件，不再需要手动安装，相关的`.desktop`文件与启动脚本可以在本repo的`data/`下找到。
+现在flakewm会在安装`.deb`包时自动安装会话文件，不再需要手动安装，相关的`.desktop`文件与启动脚本可以在本repo的`data/entries/`与`data/scripts/`下找到。
 
 
 
