@@ -1,3 +1,9 @@
+flakewm (3.0.6-gxde5) lizhi; urgency=medium
+
+  * 合成器现在会主动断开文件描述符泄露的客户端，以免阻塞系统上其他等待文件操作符的程序
+
+ -- CharOfString <root@charofstring.cc>  Mon, 23 Nov 2026 14:59:28 -0600
+
 flakewm (3.0.6-gxde4) lizhi; urgency=medium
 
   * 修复XWayland剪切板导致WM冻结的问题

@@ -4,13 +4,13 @@
 
 # Version/Release/gxde_rev 由 update-pkgver 从 debian/changelog 同步 ・ update-pkgver keeps
 # Version, Release and gxde_rev in step with debian/changelog.
-%global gxde_rev gxde4
+%global gxde_rev gxde5
 # git 标签与 Debian 版本号相同，例如 3.0.5-gxde1 ・ The git tag is the Debian version, e.g. 3.0.5-gxde1.
 %global tag %{version}-%{gxde_rev}
 
 Name:           flakewm
 Version:        3.0.6
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        GXDE Wayland compositor
 
 License:        BSD-3-Clause AND GPL-1.0-or-later AND GPL-2.0-or-later AND GPL-3.0-or-later AND LGPL-2.1-or-later AND MIT AND MIT-CMU AND MulanPSL-2.0
@@ -180,6 +180,9 @@ fi
 %{_datadir}/wayland-sessions/gxde-flakewm.desktop
 
 %changelog
+* Mon Nov 23 2026 CharOfString <root@charofstring.cc> - 3.0.6-5
+- 合成器现在会主动断开文件描述符泄露的客户端，以免阻塞系统上其他等待文件操作符的程序
+
 * Mon Nov 23 2026 CharOfString <root@charofstring.cc> - 3.0.6-4
 - 修复XWayland剪切板导致WM冻结的问题
 

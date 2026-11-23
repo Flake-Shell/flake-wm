@@ -48,22 +48,6 @@ struct security_manager {
 
 static struct security_manager *manager = NULL;
 
-/*
- * Stalled client detection.
- *
- * A client that stops reading its socket keeps every event we send it queued
- * in the kernel, including the fds attached to them (keymaps, clipboard pipes,
- * dmabuf feedback tables...). Those fds are charged to the user as "in-flight"
- * SCM_RIGHTS fds; once that count exceeds a process' RLIMIT_NOFILE, every fd
- * passing sendmsg() of that process fails with ETOOMANYREFS. With the large
- * socket buffers in use (net.core.wmem_default = 2 MiB) a single hung client
- * pinned ~4000 fds, which broke fd passing for all processes limited to 1024
- * open files (e.g. emacs, whose GTK icon loading through glycin then aborts).
- *
- * libwayland only disconnects a client after its own userspace buffer
- * overflows, which never happens while the kernel still accepts data, so we
- * disconnect clients whose unread backlog stays large for too long ourselves.
- */
 #define STALL_CHECK_INTERVAL_MS 2000
 #define STALL_DEFAULT_TIMEOUT_S 30
 /* ~1000 small fd-carrying messages, each costing ~512 bytes of skb truesize */

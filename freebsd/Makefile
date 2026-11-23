@@ -1,7 +1,7 @@
 PORTNAME=	flakewm
 DISTVERSION=	3.0.6
-DISTVERSIONSUFFIX=	-gxde4
-PORTREVISION=	3
+DISTVERSIONSUFFIX=	-gxde5
+PORTREVISION=	4
 CATEGORIES=	x11-wm wayland
 # FLAKEWM_SRC=/path/to/flake-wm builds that checkout (working tree included,
 # build/ left out) instead of the release tarball, like arch/PKGBUILD does.
