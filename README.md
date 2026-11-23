@@ -438,9 +438,8 @@ Press `Meta+S` to open or close the multitasking view. The current implementatio
 - Dragging windows into other workspaces, keeping the multitasking view open after release;
 - Dragging workspace previews to reorder workspaces.
 
-The original implementation and resources from Deepin KWin are kept in
-`src/vendor/dkwin/multitask/upstream/`, and the Wlcom adaptation layer is at
-`src/vendor/dkwin/multitask/wlcom_multitask.c`.
+It is a compositor-native port of Deepin KWin's multitask view, at
+`src/shell/gxde/multitasking/wlcom_multitask.c`.
 
 The "Multitasking View" launcher in the GXDE menu can also be used directly without modifying any desktop file.
 `flakewm` provides `com.deepin.wm` on the user session bus and connects

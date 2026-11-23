@@ -432,9 +432,8 @@ Usage: kylin-wlcom [options] [command]
 - 将窗口拖入其他工作区，释放后保持多任务视图开启；
 - 拖拽工作区预览以重新排序工作区。
 
-Deepin KWin的原始实现和资源保存在
-`src/vendor/dkwin/multitask/upstream/`，Wlcom适配层位于
-`src/vendor/dkwin/multitask/wlcom_multitask.c`。
+它是Deepin KWin多任务视图在合成器内的原生移植，位于
+`src/shell/gxde/multitasking/wlcom_multitask.c`。
 
 GXDE菜单中的「多任务视图」启动器也可直接使用，无需修改桌面文件。
 `flakewm`会在用户会话总线上提供`com.deepin.wm`，并将

@@ -41,7 +41,7 @@
 #include "server.h"
 #include "util/file.h"
 #include "view/workspace.h"
-#include "src/vendor/dkwin/multitask/multitask_assets.h"
+#include "src/shell/gxde/multitasking/multitask_assets.h"
 #include "../../../view/view_p.h"
 
 #define BRIGHTNESS 0.4f

@@ -16,7 +16,7 @@
  * ----------------------------------------------------------------------------
  * This is NOT a vendored file, but a compositor-native adapter of GXDE KWin's
  * Present Windows effect (ExposeAll, Win+A). Layout, decals and interaction
- * follow upstream's presentwindows.cpp which is kept verbatim in upstream/.
+ * follow upstream deepin-kwin's presentwindows.cpp.
  */
 
 #include <math.h>

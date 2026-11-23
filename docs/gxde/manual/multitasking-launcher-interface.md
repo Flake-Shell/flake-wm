@@ -85,7 +85,7 @@ Win+S
 相关实现位于：
 
 ```text
-src/vendor/dkwin/multitask/wlcom_multitask.c
+src/shell/gxde/multitasking/wlcom_multitask.c
 ```
 
 调用链是：
