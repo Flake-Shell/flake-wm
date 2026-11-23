@@ -1,12 +1,6 @@
-BasedOnStyle: LLVM
-IndentWidth: 4
-BreakBeforeBraces: Linux
-AllowShortFunctionsOnASingleLine: Inline
-Cpp11BracedListStyle: false
-ColumnLimit: 100
+BasedOnStyle: Google
 
-SpaceBeforeParens: ControlStatementsExceptForEachMacros
-
+# Loop-like macros, so they are laid out as loops rather than calls.
 ForEachMacros:
   - 'wl_list_for_each'
   - 'wl_list_for_each_safe'

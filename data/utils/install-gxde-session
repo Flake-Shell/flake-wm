@@ -6,7 +6,7 @@
 # 安装的文件与 debian/gxde-flake-session.install 相同。
 set -euo pipefail
 
-source_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/data
+source_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
 prefix=/usr
 sessions_dir=/usr/share/wayland-sessions
