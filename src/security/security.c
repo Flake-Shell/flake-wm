@@ -15,6 +15,10 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #endif
+#ifdef __linux__
+#include <linux/sockios.h>
+#include <sys/ioctl.h>
+#endif
 
 #include <wlr/types/wlr_security_context_v1.h>
 
@@ -37,9 +41,130 @@ struct security_manager {
     struct wl_listener new_client;
     struct wl_list global_filters;
     struct wl_listener server_destroy;
+
+    struct wl_event_source *stall_timer;
+    int stall_timeout_samples;
 };
 
 static struct security_manager *manager = NULL;
+
+/*
+ * Stalled client detection.
+ *
+ * A client that stops reading its socket keeps every event we send it queued
+ * in the kernel, including the fds attached to them (keymaps, clipboard pipes,
+ * dmabuf feedback tables...). Those fds are charged to the user as "in-flight"
+ * SCM_RIGHTS fds; once that count exceeds a process' RLIMIT_NOFILE, every fd
+ * passing sendmsg() of that process fails with ETOOMANYREFS. With the large
+ * socket buffers in use (net.core.wmem_default = 2 MiB) a single hung client
+ * pinned ~4000 fds, which broke fd passing for all processes limited to 1024
+ * open files (e.g. emacs, whose GTK icon loading through glycin then aborts).
+ *
+ * libwayland only disconnects a client after its own userspace buffer
+ * overflows, which never happens while the kernel still accepts data, so we
+ * disconnect clients whose unread backlog stays large for too long ourselves.
+ */
+#define STALL_CHECK_INTERVAL_MS 2000
+#define STALL_DEFAULT_TIMEOUT_S 30
+/* ~1000 small fd-carrying messages, each costing ~512 bytes of skb truesize */
+#define STALL_BACKLOG_BYTES (512 * 1024)
+
+#ifdef __linux__
+static int client_unread_bytes(const struct security_client *client)
+{
+    int outq = 0;
+    if (client->fd < 0 || ioctl(client->fd, SIOCOUTQ, &outq) < 0) {
+        return -1;
+    }
+    return outq;
+}
+#else
+static int client_unread_bytes(const struct security_client *client)
+{
+    return -1;
+}
+#endif
+
+static bool client_is_xwayland(const struct security_client *client)
+{
+    if (!client->path) {
+        return false;
+    }
+    const char *name = strrchr(client->path, '/');
+    name = name ? name + 1 : client->path;
+    return strcmp(name, "Xwayland") == 0;
+}
+
+static int handle_stall_timer(void *data)
+{
+    struct security_client *client, *tmp;
+    wl_list_for_each_safe(client, tmp, &manager->clients, link) {
+        int unread = client_unread_bytes(client);
+        if (unread < STALL_BACKLOG_BYTES) {
+            if (client->stalled_samples >= manager->stall_timeout_samples) {
+                kywc_log(KYWC_INFO, "client(pid=%d) %s is reading its socket again", client->pid,
+                         client->path);
+            }
+            client->stalled_samples = 0;
+            client->stall_warned = false;
+            continue;
+        }
+
+        if (++client->stalled_samples < manager->stall_timeout_samples) {
+            continue;
+        }
+
+        if (client_is_xwayland(client)) {
+            /* disconnecting Xwayland would take every X11 window down with it */
+            if (!client->stall_warned) {
+                kywc_log(KYWC_WARN, "Xwayland (pid=%d) has not read %d queued bytes for %d s",
+                         client->pid, unread,
+                         client->stalled_samples * STALL_CHECK_INTERVAL_MS / 1000);
+                client->stall_warned = true;
+            }
+            continue;
+        }
+
+        kywc_log(KYWC_WARN,
+                 "client(pid=%d) %s has not read %d queued bytes for %d s, disconnecting it",
+                 client->pid, client->path, unread,
+                 client->stalled_samples * STALL_CHECK_INTERVAL_MS / 1000);
+        /* frees client through handle_client_destroy */
+        wl_client_destroy(client->client);
+    }
+
+    wl_event_source_timer_update(manager->stall_timer, STALL_CHECK_INTERVAL_MS);
+    return 0;
+}
+
+static void stall_check_init(struct server *server)
+{
+    int timeout_s = STALL_DEFAULT_TIMEOUT_S;
+    const char *env = getenv("KYWC_CLIENT_STALL_TIMEOUT");
+    if (env && *env) {
+        char *end = NULL;
+        long value = strtol(env, &end, 10);
+        if (end && *end == '\0' && value >= 0 && value <= INT_MAX / 1000) {
+            timeout_s = value;
+        } else {
+            kywc_log(KYWC_WARN, "ignoring invalid KYWC_CLIENT_STALL_TIMEOUT=%s", env);
+        }
+    }
+
+    if (timeout_s == 0) {
+        kywc_log(KYWC_INFO, "stalled client detection disabled");
+        return;
+    }
+
+    manager->stall_timeout_samples =
+        (timeout_s * 1000 + STALL_CHECK_INTERVAL_MS - 1) / STALL_CHECK_INTERVAL_MS;
+    manager->stall_timer = wl_event_loop_add_timer(server->event_loop, handle_stall_timer, NULL);
+    if (!manager->stall_timer) {
+        kywc_log(KYWC_WARN, "failed to create stalled client timer");
+        return;
+    }
+    wl_event_source_timer_update(manager->stall_timer, STALL_CHECK_INTERVAL_MS);
+}
 
 #ifdef __FreeBSD__
 /* no /proc by default, ask the kernel */
@@ -284,6 +409,9 @@ void security_remove_global_filter(struct wl_global *global)
 static void handle_server_destroy(struct wl_listener *listener, void *data)
 {
     assert(wl_list_empty(&manager->clients));
+    if (manager->stall_timer) {
+        wl_event_source_remove(manager->stall_timer);
+    }
     /* no global destroy signal */
     struct security_global_filter *filter, *tmp;
     wl_list_for_each_safe(filter, tmp, &manager->global_filters, link) {
@@ -316,6 +444,8 @@ bool security_manager_create(struct server *server)
     if (!manager->security_context) {
         kywc_log(KYWC_WARN, "wp_security_context_manager_v1 create failed");
     }
+
+    stall_check_init(server);
 
     return true;
 }

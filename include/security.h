@@ -24,6 +24,10 @@ struct security_client {
     uid_t uid;
     gid_t gid;
     char *path;
+
+    /* consecutive stall-check samples with a large unread backlog */
+    int stalled_samples;
+    bool stall_warned;
 };
 
 typedef bool (*security_global_filter_func_t)(const struct security_client *client, void *data);
