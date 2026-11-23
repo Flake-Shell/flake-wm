@@ -213,7 +213,8 @@ static bool load_desktop(const char *fullpath, const char *subpath, const char *
         return false;
     }
 
-    int wd = inotify_add_watch(manager->watcher.event_fd, fullpath, IN_CREATE | IN_MOVED_TO);
+    // IN_CREATE fires on an empty/partial file; wait until the writer closes it
+    int wd = inotify_add_watch(manager->watcher.event_fd, fullpath, IN_CLOSE_WRITE | IN_MOVED_TO);
     if (wd >= 0) {
         icon_manager_add_watcher_fd(manager, wd, fullpath, handle_desktop, manager);
     }

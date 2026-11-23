@@ -4,12 +4,12 @@
 
 #define _DEFAULT_SOURCE
 #include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include <sys/mman.h>
 #include <sys/stat.h>
 
 #include <wayland-util.h>
@@ -133,13 +133,45 @@ struct file *file_open(const char *name, const char *delim, const char *needle)
         return NULL;
     }
 
-    file->size = st.st_size;
-    file->data = mmap(NULL, file->size, PROT_READ | PROT_WRITE, MAP_PRIVATE, file->fd, 0);
-    if (file->data == MAP_FAILED) {
+    /*
+     * Read into a NUL-terminated heap buffer instead of mmap: all parsers
+     * (strtok_r, strlen, strdup) assume a terminator. With mmap that only held
+     * by luck when st_size wasn't page-aligned; a file caught mid-write by the
+     * inotify watchers (e.g. pacman extracting a .desktop in 8 KiB chunks) is
+     * page-aligned and the parser runs off the end of the mapping.
+     */
+    if (st.st_size <= 0) {
         close(file->fd);
         free(file);
         return NULL;
     }
+
+    file->data = malloc((size_t)st.st_size + 1);
+    if (!file->data) {
+        close(file->fd);
+        free(file);
+        return NULL;
+    }
+
+    size_t total = 0;
+    while (total < (size_t)st.st_size) {
+        ssize_t n = read(file->fd, file->data + total, (size_t)st.st_size - total);
+        if (n < 0 && errno == EINTR) {
+            continue;
+        }
+        if (n <= 0) {
+            break;
+        }
+        total += (size_t)n;
+    }
+    if (total == 0) {
+        free(file->data);
+        close(file->fd);
+        free(file);
+        return NULL;
+    }
+    file->data[total] = '\0';
+    file->size = total;
 
     file->last = file->data;
     wl_array_init(&file->pairs);
@@ -169,7 +201,7 @@ void file_close(struct file *file)
         return;
     }
 
-    munmap(file->data, file->size);
+    free(file->data);
     close(file->fd);
 
     wl_array_release(&file->pairs);
