@@ -1,17 +1,4 @@
-# flakewm
-
-Packages `flakewm` and `flakewm-client` can be installed alongside `gxde-wlcom`.
-Install `gxde-flake-session` and select `gxde-flakewm` in the display manager. The session starts `/usr/bin/flakewm` through `/usr/bin/startflakewm`.
-On non-Debian systems, run `sudo ./install-gxde-session` from the source tree to install the session (`--help` for options, `-u` to uninstall).
-Configuration, plugins, private libraries and logs use independent `flakewm` paths.
-Clients link with `pkg-config flakewm-client`. D-Bus service names, object paths
-and interfaces retain their original `com.kylin.Wlcom` and `top.gxde.Wlcom` names.
-Existing callers, Wayland protocols and desktop compatibility APIs remain compatible. Concurrent full desktops need separate session buses because
-services such as `com.deepin.wm` still have a single owner per bus.
-Build options keep the `WLCOM_*` prefix. Upstream URLs and release history retain
-their original names.
-
-![](./docs/img/readme-header.png)
+![](./docs/pictures/readme-header.png)
 
 ![GitHub contributors](https://img.shields.io/github/contributors/GXDE-OS/gxde-wlcom) ![GitHub Release](https://img.shields.io/github/v/release/GXDE-OS/gxde-wlcom) ![Static Badge](https://img.shields.io/badge/license-GPL--3.0--or--later-orange) ![Static Badge](https://img.shields.io/badge/made_with-love-red)
 
