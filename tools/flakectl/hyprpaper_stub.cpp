@@ -5,6 +5,10 @@
 // over hyprwire. flakewm has no hyprpaper, and hyprwire is not packaged for
 // the distributions flakewm builds on.
 
+#include <expected>
+#include <string>
+#include <string_view>
+
 #include "hyprpaper/Hyprpaper.hpp"
 
 std::expected<void, std::string> Hyprpaper::makeHyprpaperRequest(

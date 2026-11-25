@@ -26,11 +26,13 @@
 #include <unistd.h>
 #include <wayland-server-core.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cerrno>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <iterator>
 #include <string_view>
 
 #include "absl/base/internal/raw_logging.h"
@@ -216,12 +218,7 @@ const char* SignalName(int signo) {
 }
 
 bool IsCrashSignal(int signo) {
-  for (const int crash_signal : kCrashSignals) {
-    if (signo == crash_signal) {
-      return true;
-    }
-  }
-  return false;
+  return std::ranges::find(kCrashSignals, signo) != std::end(kCrashSignals);
 }
 
 // Async-signal-safe. Only a wakeup: HandleSignalPipe() re-checks all state, so

@@ -1,3 +1,8 @@
+# As FlakeWM graduatelly migrates to C++ from C, we are now enforcing Google
+# Styled C++ guidelines.
+# However, all C source codes and vendored libraries are NOT affected.
+---
+Language: Cpp
 BasedOnStyle: Google
 
 # Loop-like macros, so they are laid out as loops rather than calls.
@@ -14,3 +19,6 @@ ForEachMacros:
   - 'xorg_list_for_each_entry_safe'
   - 'udev_list_entry_foreach'
   - 'hash_table_for_each'
+---
+Language: C
+DisableFormat: true

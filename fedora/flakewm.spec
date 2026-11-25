@@ -153,7 +153,7 @@ if [ -d %{buildroot}%{_libdir}/flakewm ]; then
 fi
 
 %files -f %{name}.files
-%license LICENSE LICENSES/GPL-1.0-or-later.txt LICENSES/LGPL-2.1-or-later.txt
+%license COPYING LICENSES/GPL-1.0-or-later.txt LICENSES/LGPL-2.1-or-later.txt
 %license LICENSES/MIT-CMU.txt LICENSES/MulanPSL-2.0.txt
 %license LICENSE.hyprland LICENSE.hyprutils
 %doc README.md README.zh.md
@@ -167,7 +167,7 @@ fi
 %{_prefix}/lib/udev/rules.d/90-flakewm-framebuffer.rules
 
 %files client
-%license LICENSE LICENSES/GPL-1.0-or-later.txt
+%license COPYING LICENSES/GPL-1.0-or-later.txt
 %{_libdir}/libflakewm-client.so.1{,.*}
 
 %files client-devel

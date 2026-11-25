@@ -334,6 +334,8 @@ if(WLCOM_EXAMPLES)
   add_subdirectory(examples)
 endif()
 
+include(cmake/lint.cmake)
+
 function(wlcom_summary_line name value)
   if(value STREQUAL "ON" OR value STREQUAL "TRUE" OR value STREQUAL "1")
     set(value "YES")
