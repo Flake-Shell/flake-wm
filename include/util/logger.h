@@ -15,6 +15,13 @@ void logger_set_level(enum kywc_log_level level);
 
 void logger_finish(void);
 
+/**
+ * the fd the log currently goes to (stderr before logger_init() and after
+ * logger_finish()), for crash reports that must not use stdio.
+ * async-signal-safe.
+ */
+int logger_get_fd(void);
+
 /* the tail of the log output, for the Hyprland IPC rollinglog, free() the result */
 char *logger_rolling_dup(void);
 
