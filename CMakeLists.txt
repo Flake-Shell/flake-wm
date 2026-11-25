@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(flakewm VERSION 1.3.0 LANGUAGES C)
+project(flakewm VERSION 1.3.0 LANGUAGES C CXX)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build" FORCE)
@@ -9,6 +9,9 @@ endif()
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 foreach(config RELWITHDEBINFO MINSIZEREL)
@@ -22,7 +25,6 @@ endforeach()
 
 include(GNUInstallDirs)
 include(CheckCCompilerFlag)
-include(CheckLanguage)
 include(cmake/wlcom_helpers.cmake)
 
 set(WLCOM_PLUGIN_DIRECTORY
@@ -265,11 +267,6 @@ if(WLCOM_TRACY)
   add_compile_definitions(TRACY_ENABLE)
 endif()
 
-check_language(CXX)
-if(CMAKE_CXX_COMPILER)
-  enable_language(CXX)
-endif()
-
 macro(wlcom_define_bool name value)
   if(${value})
     add_compile_definitions(${name}=1)
@@ -313,6 +310,7 @@ if(HAVE_NLS)
 endif()
 
 include(cmake/data.cmake)
+include(cmake/abseil.cmake)
 add_subdirectory(protocols)
 add_subdirectory(src)
 
