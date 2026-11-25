@@ -2,6 +2,64 @@
 
 Instructions for working in the `flakewm` repository.
 
+## Coding Guidelines
+> **WARN**: This part is manually modified by CharOfString. DO NOT MIDIFY THIS SECTION.
+
+Currently FlakeWM is experiencing a rewrite using C++. Here is what you need to know:
+1. We are trying to use C++ to replace the old C code base graduately.
+2. When writing new feature, it is preferred to use C++.
+
+While the old C code use LLVM styled guideline, we're enforcing **Google Styled C++ guideline** for all C++ codes in this repository. Your code must pass these requirements:
+- Header guard
+- IWYU
+- DWYU
+- Linting
+- Clang-tidy
+
+Here are some prohibited things:
+```C++
+// don't
+namespace flakewm::utils {
+  // Code here
+}  // namespace flakewm::utils
+
+// do
+namespace flakewm {
+namespace utils {
+
+// Code here
+
+}  // namespace utils
+}  // namespace flakewm
+```
+
+```C++
+// Don't
+if (condition)
+  DoSomething(now);
+
+// Do
+if (condition) {
+  DoSomething(now);
+}
+```
+
+```C++
+// Don't
+// Do not use markdown `code` in the comment
+
+// Do
+// Just output the word code above as-is
+```
+
+For each class, they should have their own folder. e.g. instead of having `src/action.c`, `src/binging.c`, etc. You should have `src/action/action.h` `src/action/action.cc`...
+
+Use nested namespaces accordingly. The top namespaces would always be `flakewm`, and the choices of the nested one could be: `backend`, `config`, `efect`, `input`, `output`, `painter`, `patches`, `plugin`, `render`, `scene`, `security`, `shell`, `theme`, `util`, `vendor`, `view`, `widget`, `xwayland`.
+
+You need to provide doxygen documentation. Use simple English while making comments.
+
+Memory safety matters so use ASAN & valgrind to check out memory safety issues that is newly introduced after your changes is done.
+
 ## Project Overview
 
 `flakewm` is a wlroots-based Wayland compositor maintained by the GXDE OS team.
