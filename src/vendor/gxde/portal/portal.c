@@ -42,6 +42,8 @@ struct portal {
     bool active;
     bool dropped;
     struct wl_event_source *finish_idle;
+    /* the event loop is gone or going, no new idle sources */
+    bool display_destroyed;
     struct wl_listener activate_view;
     struct wl_listener active_fullscreen;
     bool fullscreen_listening;
@@ -53,6 +55,7 @@ struct portal {
     struct wl_listener seat_destroy;
     struct wl_listener drag_destroy;
     struct wl_listener drag_drop;
+    struct wl_listener display_destroy;
     struct wl_listener server_destroy;
 
     struct seat_pointer_grab grab;
@@ -243,8 +246,10 @@ static void handle_drag_destroy(struct wl_listener *listener, void *data)
             wl_event_source_remove(p->finish_idle);
             p->finish_idle = NULL;
         }
-        p->finish_idle = wl_event_loop_add_idle(
-            wl_display_get_event_loop(p->server->display), finish_portal_drop, p);
+        if (!p->display_destroyed) {
+            p->finish_idle = wl_event_loop_add_idle(
+                wl_display_get_event_loop(p->server->display), finish_portal_drop, p);
+        }
     } else {
         portal_emit_drag_ended();
     }
@@ -318,6 +323,18 @@ static void handle_seat_destroy(struct wl_listener *listener, void *data)
     p->target_uuid[0] = '\0';
 }
 
+/* the event loop goes away with the display, before server destroy listeners run */
+static void handle_display_destroy(struct wl_listener *listener, void *data)
+{
+    struct portal *p = wl_container_of(listener, p, display_destroy);
+    wl_list_remove(&p->display_destroy.link);
+    p->display_destroyed = true;
+    if (p->finish_idle) {
+        wl_event_source_remove(p->finish_idle);
+        p->finish_idle = NULL;
+    }
+}
+
 static void handle_server_destroy(struct wl_listener *listener, void *data)
 {
     struct portal *p = wl_container_of(listener, p, server_destroy);
@@ -328,10 +345,6 @@ static void handle_server_destroy(struct wl_listener *listener, void *data)
         wl_list_remove(&p->drag_destroy.link);
         wl_list_remove(&p->drag_drop.link);
         p->drag = NULL;
-    }
-    if (p->finish_idle) {
-        wl_event_source_remove(p->finish_idle);
-        p->finish_idle = NULL;
     }
     wl_list_remove(&p->activate_view.link);
     if (p->fullscreen_listening) {
@@ -404,6 +417,8 @@ void portal_create(struct view_manager *view_manager)
     p->seat_destroy.notify = handle_seat_destroy;
     wl_signal_add(&seat->events.destroy, &p->seat_destroy);
 
+    p->display_destroy.notify = handle_display_destroy;
+    wl_display_add_destroy_listener(p->server->display, &p->display_destroy);
     p->server_destroy.notify = handle_server_destroy;
     server_add_destroy_listener(p->server, &p->server_destroy);
 

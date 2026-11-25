@@ -40,6 +40,7 @@ struct security_manager {
     struct wl_list clients;
     struct wl_listener new_client;
     struct wl_list global_filters;
+    struct wl_listener display_destroy;
     struct wl_listener server_destroy;
 
     struct wl_event_source *stall_timer;
@@ -390,12 +391,20 @@ void security_remove_global_filter(struct wl_global *global)
     }
 }
 
+/* the event loop goes away with the display, before server destroy listeners run */
+static void handle_display_destroy(struct wl_listener *listener, void *data)
+{
+    wl_list_remove(&manager->display_destroy.link);
+    wl_list_remove(&manager->new_client.link);
+    if (manager->stall_timer) {
+        wl_event_source_remove(manager->stall_timer);
+        manager->stall_timer = NULL;
+    }
+}
+
 static void handle_server_destroy(struct wl_listener *listener, void *data)
 {
     assert(wl_list_empty(&manager->clients));
-    if (manager->stall_timer) {
-        wl_event_source_remove(manager->stall_timer);
-    }
     /* no global destroy signal */
     struct security_global_filter *filter, *tmp;
     wl_list_for_each_safe(filter, tmp, &manager->global_filters, link) {
@@ -418,6 +427,8 @@ bool security_manager_create(struct server *server)
     manager->new_client.notify = handle_new_client;
     wl_display_add_client_created_listener(server->display, &manager->new_client);
 
+    manager->display_destroy.notify = handle_display_destroy;
+    wl_display_add_destroy_listener(server->display, &manager->display_destroy);
     manager->server_destroy.notify = handle_server_destroy;
     server_add_destroy_listener(server, &manager->server_destroy);
 
