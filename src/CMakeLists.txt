@@ -1,7 +1,7 @@
 add_executable(flakewm)
 
 target_sources(flakewm PRIVATE
-  main.c
+  main.cc
   server.c
   gxde_identifier.c
   app_id_resolver.c
@@ -336,6 +336,7 @@ target_sources(flakewm PRIVATE
   util/file.c
   util/hash_table.c
   util/identifier.c
+  util/kywc_log_sink.cc
   util/limit.c
   util/logger.c
   util/matrix.c
@@ -525,6 +526,13 @@ target_include_directories(flakewm PRIVATE
 )
 
 target_link_libraries(flakewm PRIVATE
+  absl::log
+  absl::log_entry
+  absl::log_globals
+  absl::log_initialize
+  absl::log_sink
+  absl::log_sink_registry
+  absl::raw_logging_internal
   wlcom-protocols
   Wlroots::wlroots
   PkgConfig::WAYLAND_SERVER
@@ -536,12 +544,19 @@ target_link_libraries(flakewm PRIVATE
   rt
 )
 
+if(HAVE_NLS)
+  target_link_libraries(flakewm PRIVATE Intl::Intl)
+endif()
+
 if(HAVE_XWAYLAND)
   target_link_libraries(flakewm PRIVATE PkgConfig::WLCOM_XWAYLAND_DEPS)
 endif()
 
 if(HAVE_LIBUNWIND)
   target_link_libraries(flakewm PRIVATE PkgConfig::LIBUNWIND)
+else()
+  target_include_directories(flakewm PRIVATE ${Backtrace_INCLUDE_DIRS})
+  target_link_libraries(flakewm PRIVATE ${Backtrace_LIBRARIES})
 endif()
 
 if(HAVE_LIBEIS)

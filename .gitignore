@@ -841,3 +841,7 @@ build/*
 # Build artifacts from the previous package name.
 /debian/gxde-wlcom/
 /debian/gxde-wlcom-client/
+
+# Archlinux packaging
+arch/*
+!arch/PKGBUILD

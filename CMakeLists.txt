@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(flakewm VERSION 1.3.0 LANGUAGES C)
+project(flakewm VERSION 1.3.0 LANGUAGES C CXX)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build" FORCE)
@@ -9,6 +9,9 @@ endif()
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 foreach(config RELWITHDEBINFO MINSIZEREL)
@@ -22,7 +25,6 @@ endforeach()
 
 include(GNUInstallDirs)
 include(CheckCCompilerFlag)
-include(CheckLanguage)
 include(cmake/wlcom_helpers.cmake)
 
 set(WLCOM_PLUGIN_DIRECTORY
@@ -220,6 +222,11 @@ if(NOT WLCOM_LIBUNWIND STREQUAL "disabled")
   endif()
   set(HAVE_LIBUNWIND ${LIBUNWIND_FOUND})
 endif()
+# without libunwind, crash backtraces use backtrace(3): in glibc, but in
+# libexecinfo on FreeBSD
+if(NOT HAVE_LIBUNWIND)
+  find_package(Backtrace REQUIRED)
+endif()
 
 # Linux is the primary target and keeps its paths and dependencies. FreeBSD
 # has no framebuffer backend, takes sd-bus from basu and installs under PREFIX.
@@ -247,12 +254,15 @@ endif()
 
 set(HAVE_NLS OFF)
 if(NOT WLCOM_NLS STREQUAL "disabled")
+  # gettext is in glibc, elsewhere (FreeBSD, musl) it is libintl
   if(WLCOM_NLS STREQUAL "enabled")
     find_program(MSGFMT_EXECUTABLE msgfmt REQUIRED)
+    find_package(Intl REQUIRED)
   else()
     find_program(MSGFMT_EXECUTABLE msgfmt)
+    find_package(Intl)
   endif()
-  if(MSGFMT_EXECUTABLE)
+  if(MSGFMT_EXECUTABLE AND Intl_FOUND)
     set(HAVE_NLS ON)
   endif()
 endif()
@@ -263,11 +273,6 @@ if(WLCOM_TRACY)
     message(FATAL_ERROR "tracy ${TRACY_VERSION} found, but < 0.12.0 is required")
   endif()
   add_compile_definitions(TRACY_ENABLE)
-endif()
-
-check_language(CXX)
-if(CMAKE_CXX_COMPILER)
-  enable_language(CXX)
 endif()
 
 macro(wlcom_define_bool name value)
@@ -313,6 +318,7 @@ if(HAVE_NLS)
 endif()
 
 include(cmake/data.cmake)
+include(cmake/abseil.cmake)
 add_subdirectory(protocols)
 add_subdirectory(src)
 
@@ -327,6 +333,8 @@ endif()
 if(WLCOM_EXAMPLES)
   add_subdirectory(examples)
 endif()
+
+include(cmake/lint.cmake)
 
 function(wlcom_summary_line name value)
   if(value STREQUAL "ON" OR value STREQUAL "TRUE" OR value STREQUAL "1")

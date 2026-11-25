@@ -4,6 +4,7 @@
 
 #define _POSIX_C_SOURCE 200809L
 #include <pthread.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,7 +17,10 @@
 #include "util/logger.h"
 #include "util/string.h"
 
+/* NULL before logger_init() and after logger_finish(): log to stderr then */
 static FILE *log_fp = NULL;
+/* fileno() of the current output, for crash reports from signal handlers */
+static volatile sig_atomic_t log_fd = STDERR_FILENO;
 static enum kywc_log_level log_level = KYWC_WARN;
 static bool log_in_realtime = true;
 
@@ -106,6 +110,17 @@ void logger_set_tap(logger_tap_func_t tap, void *data)
     rolling.tap_data = data;
 }
 
+static void set_output(FILE *fp)
+{
+    log_fp = fp;
+    log_fd = fp ? fileno(fp) : STDERR_FILENO;
+}
+
+int logger_get_fd(void)
+{
+    return log_fd;
+}
+
 static void log_file(enum kywc_log_level level, const char *fmt, va_list args)
 {
     if (level > log_level) {
@@ -118,27 +133,30 @@ static void log_file(enum kywc_log_level level, const char *fmt, va_list args)
     va_end(copy);
 
     // FIXME: thread-safe
+    FILE *fp = log_fp ? log_fp : stderr;
     if (log_in_realtime) {
         time_t time_log = time(NULL);
-        struct tm *tm_log = localtime(&time_log);
-        fprintf(log_fp, "[%04d-%02d-%02d %02d:%02d:%02d] %s: ", tm_log->tm_year + 1900,
-                tm_log->tm_mon + 1, tm_log->tm_mday, tm_log->tm_hour, tm_log->tm_min,
-                tm_log->tm_sec, log_fp == stdout ? level_colors[level] : level_headers[level]);
+        /* localtime() returns a buffer shared by all threads */
+        struct tm tm_log = { 0 };
+        localtime_r(&time_log, &tm_log);
+        fprintf(fp, "[%04d-%02d-%02d %02d:%02d:%02d] %s: ", tm_log.tm_year + 1900,
+                tm_log.tm_mon + 1, tm_log.tm_mday, tm_log.tm_hour, tm_log.tm_min, tm_log.tm_sec,
+                fp == stdout ? level_colors[level] : level_headers[level]);
     } else {
         struct timespec ts = { 0 };
         clock_gettime(CLOCK_MONOTONIC, &ts);
-        fprintf(log_fp, "[%02d:%02d:%02d.%06ld] %s: ", (int)(ts.tv_sec / 60 / 60),
+        fprintf(fp, "[%02d:%02d:%02d.%06ld] %s: ", (int)(ts.tv_sec / 60 / 60),
                 (int)(ts.tv_sec / 60 % 60), (int)(ts.tv_sec % 60), ts.tv_nsec / 1000,
-                log_fp == stdout ? level_colors[level] : level_headers[level]);
+                fp == stdout ? level_colors[level] : level_headers[level]);
     }
 
-    vfprintf(log_fp, fmt, args);
-    if (log_fp == stdout) {
-        fprintf(log_fp, "\x1B[0m");
+    vfprintf(fp, fmt, args);
+    if (fp == stdout) {
+        fprintf(fp, "\x1B[0m");
     }
-    fprintf(log_fp, "\n");
+    fprintf(fp, "\n");
 
-    fflush(log_fp);
+    fflush(fp);
 }
 
 void kywc_log(enum kywc_log_level level, const char *format, ...)
@@ -188,9 +206,9 @@ void logger_init(enum kywc_log_level level, bool log_to_file, bool realtime)
     log_level = detect_log_level(level);
     fprintf(stdout, "logger: current log level is %s\n", level_headers[log_level]);
 
-    /* don't log to file */
+    /* stdout unless the log file below opens */
+    set_output(stdout);
     if (!log_to_file) {
-        log_fp = stdout;
         return;
     }
 
@@ -214,12 +232,13 @@ void logger_init(enum kywc_log_level level, bool log_to_file, bool realtime)
     free(log_dir);
     fprintf(stdout, "logger: path is %s\n", log_path);
 
-    log_fp = fopen(log_path, "a"); // appending mode
+    FILE *fp = fopen(log_path, "a"); // appending mode
     free(log_path);
-    if (!log_fp) {
+    if (!fp) {
         fprintf(stderr, "logger: create log file failed: %s\n", strerror(errno));
         return;
     }
+    set_output(fp);
 }
 
 enum kywc_log_level kywc_log_get_level(void)
@@ -239,10 +258,15 @@ void logger_set_level(enum kywc_log_level level)
 
 void logger_finish(void)
 {
-    if (!log_fp) {
+    FILE *fp = log_fp;
+    /* switch to stderr before closing, for later kywc_log() and crash reports */
+    set_output(NULL);
+    if (!fp) {
         return;
     }
 
-    fflush(log_fp);
-    fclose(log_fp);
+    fflush(fp);
+    if (fp != stdout && fp != stderr) {
+        fclose(fp);
+    }
 }

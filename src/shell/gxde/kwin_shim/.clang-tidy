@@ -1,0 +1,9 @@
+# As FlakeWM graduatelly migrates to C++ from C, we are now enforcing Google
+# Styled C++ guidelines.
+# However, all C source codes and vendored libraries are NOT affected.
+
+InheritParentConfig: true
+Checks: >
+  -google-default-arguments,
+  -readability-identifier-naming,
+  -readability-redundant-access-specifiers,

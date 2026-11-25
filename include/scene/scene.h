@@ -398,10 +398,10 @@ void ky_scene_node_reset_blur_level(struct ky_scene_node *node);
 /* if node hasn't blur, bur region is empty. */
 void ky_scene_node_get_blur_info(struct ky_scene_node *node, struct blur_info *info);
 
-void ky_scene_node_set_radius(struct ky_scene_node *node, const int radius[static 4]);
+void ky_scene_node_set_radius(struct ky_scene_node *node, const int radius[4]);
 
 /* radius on bounding box */
-void ky_scene_node_get_radius(struct ky_scene_node *node, int radius[static 4]);
+void ky_scene_node_get_radius(struct ky_scene_node *node, int radius[4]);
 
 bool ky_scene_node_is_visible(struct ky_scene_node *node);
 
@@ -416,11 +416,11 @@ void ky_scene_set_presentation(struct ky_scene *scene, struct wlr_presentation *
  * scene rect
  */
 struct ky_scene_rect *ky_scene_rect_create(struct ky_scene_tree *parent, int width, int height,
-                                           const float color[static 4]);
+                                           const float color[4]);
 
 void ky_scene_rect_set_size(struct ky_scene_rect *rect, int width, int height);
 
-void ky_scene_rect_set_color(struct ky_scene_rect *rect, const float color[static 4]);
+void ky_scene_rect_set_color(struct ky_scene_rect *rect, const float color[4]);
 
 struct ky_scene_rect *ky_scene_rect_from_node(struct ky_scene_node *node);
 
@@ -449,7 +449,7 @@ void ky_scene_buffer_set_opaque_region(struct ky_scene_buffer *scene_buffer,
                                        const pixman_region32_t *region);
 
 void ky_scene_buffer_set_border(struct ky_scene_buffer *scene_buffer, float width,
-                                const float color[static 4]);
+                                const float color[4]);
 
 void ky_scene_buffer_set_source_box(struct ky_scene_buffer *scene_buffer,
                                     const struct wlr_fbox *box);
