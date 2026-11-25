@@ -222,6 +222,11 @@ if(NOT WLCOM_LIBUNWIND STREQUAL "disabled")
   endif()
   set(HAVE_LIBUNWIND ${LIBUNWIND_FOUND})
 endif()
+# without libunwind, crash backtraces use backtrace(3): in glibc, but in
+# libexecinfo on FreeBSD
+if(NOT HAVE_LIBUNWIND)
+  find_package(Backtrace REQUIRED)
+endif()
 
 # Linux is the primary target and keeps its paths and dependencies. FreeBSD
 # has no framebuffer backend, takes sd-bus from basu and installs under PREFIX.
@@ -249,12 +254,15 @@ endif()
 
 set(HAVE_NLS OFF)
 if(NOT WLCOM_NLS STREQUAL "disabled")
+  # gettext is in glibc, elsewhere (FreeBSD, musl) it is libintl
   if(WLCOM_NLS STREQUAL "enabled")
     find_program(MSGFMT_EXECUTABLE msgfmt REQUIRED)
+    find_package(Intl REQUIRED)
   else()
     find_program(MSGFMT_EXECUTABLE msgfmt)
+    find_package(Intl)
   endif()
-  if(MSGFMT_EXECUTABLE)
+  if(MSGFMT_EXECUTABLE AND Intl_FOUND)
     set(HAVE_NLS ON)
   endif()
 endif()

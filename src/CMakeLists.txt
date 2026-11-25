@@ -544,12 +544,19 @@ target_link_libraries(flakewm PRIVATE
   rt
 )
 
+if(HAVE_NLS)
+  target_link_libraries(flakewm PRIVATE Intl::Intl)
+endif()
+
 if(HAVE_XWAYLAND)
   target_link_libraries(flakewm PRIVATE PkgConfig::WLCOM_XWAYLAND_DEPS)
 endif()
 
 if(HAVE_LIBUNWIND)
   target_link_libraries(flakewm PRIVATE PkgConfig::LIBUNWIND)
+else()
+  target_include_directories(flakewm PRIVATE ${Backtrace_INCLUDE_DIRS})
+  target_link_libraries(flakewm PRIVATE ${Backtrace_LIBRARIES})
 endif()
 
 if(HAVE_LIBEIS)
