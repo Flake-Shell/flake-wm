@@ -60,13 +60,18 @@ static void handle_workspace_destroy(struct wl_listener *listener, void *data)
     struct kde_virtual_desktop *virtual_desktop =
         wl_container_of(listener, virtual_desktop, destroy);
 
+    wl_list_remove(&virtual_desktop->activate.link);
     wl_list_remove(&virtual_desktop->destroy.link);
     wl_list_remove(&virtual_desktop->link);
 
     struct kde_virtual_desktop_management *management = virtual_desktop->management;
-    struct wl_resource *resource;
-    wl_resource_for_each(resource, &virtual_desktop->resources) {
+    /* clients may keep the resources, detach them from the desktop freed below */
+    struct wl_resource *resource, *tmp;
+    wl_resource_for_each_safe(resource, tmp, &virtual_desktop->resources) {
         org_kde_plasma_virtual_desktop_send_removed(resource);
+        wl_resource_set_user_data(resource, NULL);
+        wl_list_remove(wl_resource_get_link(resource));
+        wl_list_init(wl_resource_get_link(resource));
     }
 
     wl_resource_for_each(resource, &management->resources) {
@@ -137,6 +142,10 @@ get_virtual_desktop(struct kde_virtual_desktop_management *management, const cha
 static void handle_request_activate(struct wl_client *client, struct wl_resource *resource)
 {
     struct kde_virtual_desktop *virtual_desktop = wl_resource_get_user_data(resource);
+    /* the desktop was removed */
+    if (!virtual_desktop) {
+        return;
+    }
 
     workspace_activate(virtual_desktop->workspace);
 }
