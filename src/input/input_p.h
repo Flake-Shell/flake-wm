@@ -381,6 +381,9 @@ bool bindings_handle_key_binding(struct keyboard_state *keyboard_state, bool *re
 
 bool bindings_handle_gesture_binding(struct gesture_state *gesture_state);
 
+/* --gxde-lsg-immersive: no key, gesture or client hotkey binding fires */
+bool bindings_all_disabled(void);
+
 /**
  * input action key grabbing, used by the shortcut capture in control center
  */

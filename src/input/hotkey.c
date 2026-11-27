@@ -368,7 +368,7 @@ static bool hotkey_release(struct hotkey *hotkey, const void *device, uint32_t c
 bool hotkeys_handle_key(struct keyboard *keyboard, uint32_t key, bool pressed, uint32_t time,
                         uint32_t modifiers, bool allow_press)
 {
-    if (wl_list_empty(&hotkeys.list)) {
+    if (wl_list_empty(&hotkeys.list) || bindings_all_disabled()) {
         return false;
     }
 
@@ -419,7 +419,7 @@ static uint32_t seat_modifiers(struct seat *seat)
 bool hotkeys_handle_button(struct seat *seat, uint32_t button, bool pressed, uint32_t time,
                            bool allow_press)
 {
-    if (wl_list_empty(&hotkeys.list)) {
+    if (wl_list_empty(&hotkeys.list) || bindings_all_disabled()) {
         return false;
     }
 

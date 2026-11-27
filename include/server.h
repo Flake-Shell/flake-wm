@@ -27,6 +27,8 @@ struct server {
         bool emergency_term_keybind;
         /* --hypr-unix-socket-sim-enable: Hyprland-compatible IPC sockets */
         bool enable_hypr_unix_socket_sim;
+        /* --gxde-lsg-immersive: no shortcut fires, implies no_default_keybind */
+        bool lsg_immersive;
     } options;
 
     struct {

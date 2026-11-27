@@ -64,6 +64,7 @@ enum LongOption : int {
   kNoDefaultKeybind = 0x100,
   kEmergencyTermKeybind,
   kHyprUnixSocketSim,
+  kGxdeLsgImmersive,
 };
 
 constexpr option kLongOptions[] = {
@@ -75,6 +76,7 @@ constexpr option kLongOptions[] = {
     {"no-default-keybind", no_argument, nullptr, kNoDefaultKeybind},
     {"emergency-term-keybind", no_argument, nullptr, kEmergencyTermKeybind},
     {"hypr-unix-socket-sim-enable", no_argument, nullptr, kHyprUnixSocketSim},
+    {"gxde-lsg-immersive", no_argument, nullptr, kGxdeLsgImmersive},
     {nullptr, 0, nullptr, 0},
 };
 
@@ -95,6 +97,10 @@ constexpr char kUsage[] = R"(Usage: flakewm [options] [command]
       --hypr-unix-socket-sim-enable
                            Serve Hyprland-compatible IPC sockets and export
                            HYPRLAND_INSTANCE_SIGNATURE (off by default).
+      --gxde-lsg-immersive Immersive mode: no key binding, gesture binding or
+                           client hotkey ever fires, including ones added at
+                           runtime. Implies --no-default-keybind. VT switching
+                           still works.
 
 )";
 
@@ -514,6 +520,9 @@ int Run(int argc, char* argv[]) {
         break;
       case kHyprUnixSocketSim:
         compositor.options.enable_hypr_unix_socket_sim = true;
+        break;
+      case kGxdeLsgImmersive:
+        compositor.options.lsg_immersive = true;
         break;
       default:
         std::fputs(kUsage, stderr);

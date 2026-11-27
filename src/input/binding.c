@@ -63,6 +63,9 @@ static struct bindings {
     uint32_t keysyms_binding_masks; /* binding mask */
 
     bool defaults_disabled;
+    /* Bindings added at runtime still register, so callers that drop a
+     * config entry on a failed register keep it, but never fire. */
+    bool all_disabled;
 } *bindings = NULL;
 
 const struct key_binding_type2string {
@@ -277,8 +280,12 @@ bool bindings_create(struct input_manager *input_manager)
         wl_list_init(&keysyms_binding->bindings);
     }
     wl_list_init(&bindings->gesture_bindings);
-    bindings->defaults_disabled = input_manager->server->options.no_default_keybind;
-    if (bindings->defaults_disabled) {
+    bindings->all_disabled = input_manager->server->options.lsg_immersive;
+    bindings->defaults_disabled =
+        input_manager->server->options.no_default_keybind || bindings->all_disabled;
+    if (bindings->all_disabled) {
+        kywc_log(KYWC_INFO, "immersive mode: all key and gesture bindings are disabled");
+    } else if (bindings->defaults_disabled) {
         kywc_log(KYWC_INFO, "default key bindings are disabled");
     }
 
@@ -301,7 +308,7 @@ static bool match_key_binding(struct keyboard_state *keyboard_state, struct key_
 
 bool bindings_handle_key_binding(struct keyboard_state *keyboard_state, bool *repeat)
 {
-    if (session_lock_is_active() || bindings->keysym_bindings_block) {
+    if (bindings->all_disabled || session_lock_is_active() || bindings->keysym_bindings_block) {
         return false;
     }
 
@@ -624,7 +631,7 @@ bool kywc_gesture_binding_register(struct gesture_binding *binding,
 
 bool bindings_handle_gesture_binding(struct gesture_state *gesture_state)
 {
-    if (session_lock_is_active()) {
+    if (bindings->all_disabled || session_lock_is_active()) {
         return false;
     }
 
@@ -697,6 +704,11 @@ void kywc_key_binding_for_each_typed(binding_typed_iterator_func_t iterator, voi
 bool kywc_key_binding_defaults_disabled(void)
 {
     return bindings && bindings->defaults_disabled;
+}
+
+bool bindings_all_disabled(void)
+{
+    return bindings && bindings->all_disabled;
 }
 
 void kywc_key_binding_block_all(bool block)
