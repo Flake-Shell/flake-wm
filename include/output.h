@@ -54,6 +54,14 @@ struct output {
     struct wl_listener precommit;
     struct wl_listener commit;
     struct wl_listener destroy;
+    /* host window resizes of a nested output, see follows_host_window */
+    struct wl_listener request_state;
+
+    /*
+     * Nested in a Wayland or X11 session: the size follows the host window,
+     * so it is not read from or written to the output config.
+     */
+    bool follows_host_window;
 
     /* Follow host-provided preferred modes on virtual DRM connectors. */
     int drm_fd;

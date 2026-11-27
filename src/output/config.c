@@ -743,14 +743,17 @@ bool output_read_config(struct output *output, struct kywc_output_state *state)
     if (json_object_object_get_ex(config, "enabled", &data)) {
         state->power = state->enabled = json_object_get_boolean(data);
     }
-    if (json_object_object_get_ex(config, "width", &data)) {
-        state->width = json_object_get_int(data);
-    }
-    if (json_object_object_get_ex(config, "height", &data)) {
-        state->height = json_object_get_int(data);
-    }
-    if (json_object_object_get_ex(config, "refresh", &data)) {
-        state->refresh = json_object_get_int(data);
+    /* a nested output takes its size from the host window */
+    if (!output->follows_host_window) {
+        if (json_object_object_get_ex(config, "width", &data)) {
+            state->width = json_object_get_int(data);
+        }
+        if (json_object_object_get_ex(config, "height", &data)) {
+            state->height = json_object_get_int(data);
+        }
+        if (json_object_object_get_ex(config, "refresh", &data)) {
+            state->refresh = json_object_get_int(data);
+        }
     }
     if (json_object_object_get_ex(config, "transform", &data)) {
         state->transform = json_object_get_int(data);
@@ -811,9 +814,11 @@ void output_write_config(struct output *output)
 
     json_object_object_add(config, "uuid", json_object_new_string(output->base.uuid));
     json_object_object_add(config, "enabled", json_object_new_boolean(state->enabled));
-    json_object_object_add(config, "width", json_object_new_int(state->width));
-    json_object_object_add(config, "height", json_object_new_int(state->height));
-    json_object_object_add(config, "refresh", json_object_new_int(state->refresh));
+    if (!output->follows_host_window) {
+        json_object_object_add(config, "width", json_object_new_int(state->width));
+        json_object_object_add(config, "height", json_object_new_int(state->height));
+        json_object_object_add(config, "refresh", json_object_new_int(state->refresh));
+    }
     json_object_object_add(config, "scale", json_object_new_double(state->scale));
     json_object_object_add(config, "transform", json_object_new_int(state->transform));
     json_object_object_add(config, "lx", json_object_new_int(state->lx));

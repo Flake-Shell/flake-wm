@@ -11,6 +11,10 @@
 
 #include <wlr/backend/drm.h>
 #include <wlr/backend/headless.h>
+#include <wlr/config.h>
+#if WLR_HAS_X11_BACKEND
+#include <wlr/backend/x11.h>
+#endif
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/util/region.h>
@@ -409,6 +413,19 @@ out:
     return 0;
 }
 
+/* exported by wlroots, <wlr/backend/wayland.h> would pull in wayland-client */
+bool wlr_output_is_wl(struct wlr_output *output);
+
+static bool output_is_nested(struct wlr_output *wlr_output)
+{
+#if WLR_HAS_X11_BACKEND
+    if (wlr_output_is_x11(wlr_output)) {
+        return true;
+    }
+#endif
+    return wlr_output_is_wl(wlr_output);
+}
+
 static bool output_is_virtualbox(struct wlr_output *wlr_output)
 {
     // VirtualBox's VMSVGA connector exposes an EDID with manufacturer "VBX"
@@ -520,6 +537,7 @@ static struct output *output_create(const char *name, struct wlr_output *wlr_out
     output->gamma[0] = output->gamma[1] = output->gamma[2] = 1.0f;
     output->ctm[0] = output->ctm[1] = output->ctm[2] = 1.0f;
     output->wlr_output = wlr_output;
+    output->follows_host_window = output_is_nested(wlr_output);
     wlr_output->data = output;
 
     struct kywc_output *kywc_output = &output->base;
@@ -666,6 +684,60 @@ static void handle_output_commit(struct wl_listener *listener, void *data)
              output->wlr_output->refresh);
     output_sync_committed_state(output, output->wlr_output->enabled);
     output_manager_emit_configured(CONFIGURE_TYPE_UPDATE);
+}
+
+/*
+ * The Wayland and X11 backends turn a resize of the host window into a mode
+ * request; wlroots leaves applying it to the compositor.
+ */
+static void handle_output_request_state(struct wl_listener *listener, void *data)
+{
+    struct output *output = wl_container_of(listener, output, request_state);
+    const struct wlr_output_event_request_state *event = data;
+    const struct wlr_output_state *requested = event->state;
+
+    if (!(requested->committed & WLR_OUTPUT_STATE_MODE) || !output->base.state.enabled) {
+        return;
+    }
+
+    struct kywc_output_state state = output->base.state;
+    if (requested->mode_type == WLR_OUTPUT_STATE_MODE_FIXED && requested->mode) {
+        state.width = requested->mode->width;
+        state.height = requested->mode->height;
+        state.refresh = requested->mode->refresh;
+    } else if (requested->mode_type == WLR_OUTPUT_STATE_MODE_CUSTOM) {
+        state.width = requested->custom_mode.width;
+        state.height = requested->custom_mode.height;
+        state.refresh = requested->custom_mode.refresh;
+    } else {
+        return;
+    }
+
+    if (state.width <= 0 || state.height <= 0 ||
+        (state.width == output->base.state.width && state.height == output->base.state.height &&
+         state.refresh == output->base.state.refresh)) {
+        return;
+    }
+
+    /*
+     * A nested output has no real modes, only the one made up from its
+     * initial size in output_get_prop. Keep it the current size, so that
+     * mode lists do not fill up with every size of a drag.
+     */
+    if (wl_list_empty(&output->wlr_output->modes) &&
+        wl_list_length(&output->base.prop.modes) == 1) {
+        struct kywc_output_mode *mode =
+            wl_container_of(output->base.prop.modes.next, mode, link);
+        mode->width = state.width;
+        mode->height = state.height;
+        mode->refresh = state.refresh;
+    }
+
+    kywc_log(KYWC_INFO, "output %s resized by host to %d x %d", output->base.name, state.width,
+             state.height);
+    if (kywc_output_set_state(&output->base, &state)) {
+        output_manager_emit_configured(CONFIGURE_TYPE_UPDATE);
+    }
 }
 
 static void handle_output_frame(struct wl_listener *listener, void *data)
@@ -844,6 +916,7 @@ static void handle_output_destroy(struct wl_listener *listener, void *data)
     wl_list_remove(&output->frame.link);
     wl_list_remove(&output->present.link);
     wl_list_remove(&output->commit.link);
+    wl_list_remove(&output->request_state.link);
 
     if (output->hotplug_mode_update_timer) {
         wl_event_source_remove(output->hotplug_mode_update_timer);
@@ -891,6 +964,8 @@ static void handle_new_output(struct wl_listener *listener, void *data)
     wl_signal_add(&wlr_output->events.frame, &output->frame);
     wl_signal_add(&wlr_output->events.destroy, &output->destroy);
     wl_signal_add(&wlr_output->events.commit, &output->commit);
+    output->request_state.notify = handle_output_request_state;
+    wl_signal_add(&wlr_output->events.request_state, &output->request_state);
 
     pixman_region32_init_rect(&output->damage_region, output->geometry.x, output->geometry.y,
                               output->geometry.width, output->geometry.height);
