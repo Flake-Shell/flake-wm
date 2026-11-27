@@ -5,7 +5,7 @@
 root = true
 
 # .h is C, except for the C++ headers listed here (also in .clang-format-ignore)
-[{**.cc,**.cpp,src/c_compact.h,src/util/kywc_log_sink.h,src/shell/gxde/kwin_shim/**.h}]
+[{**.cc,**.cpp,src/c_compact.h,src/misc/**.h,src/util/kywc_log_sink.h,src/shell/gxde/kwin_shim/**.h}]
 charset = utf-8
 end_of_line = lf
 indent_size = 2

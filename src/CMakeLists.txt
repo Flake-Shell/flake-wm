@@ -3,7 +3,7 @@ add_executable(flakewm)
 target_sources(flakewm PRIVATE
   main.cc
   server.c
-  gxde_identifier.c
+  misc/gxde_identifier.cc
   app_id_resolver.c
   patches/matrix.c
   patches/damage_ring.c
