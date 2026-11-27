@@ -24,6 +24,7 @@
 #include "backend/fbdev.h"
 #include "effect/output_transform.h"
 #include "output_p.h"
+#include "src/output/lsg_immersive_client/lsg_immersive_client.h"
 #include "render/profile.h"
 #include "util/debug.h"
 #include "util/quirks.h"
@@ -539,6 +540,11 @@ static struct output *output_create(const char *name, struct wlr_output *wlr_out
     output->wlr_output = wlr_output;
     output->follows_host_window = output_is_nested(wlr_output);
     wlr_output->data = output;
+    /* before the first commit maps the host window */
+    if (output_manager->server->options.lsg_immersive_client) {
+        output->lsg_immersive_client =
+            lsg_immersive_client_create(wlr_output, wlr_output->backend, name);
+    }
 
     struct kywc_output *kywc_output = &output->base;
     kywc_output->name = name;
@@ -674,6 +680,10 @@ static void handle_output_commit(struct wl_listener *listener, void *data)
     const struct wlr_output_event_commit *event = data;
     const uint32_t geometry_state = WLR_OUTPUT_STATE_MODE | WLR_OUTPUT_STATE_SCALE |
         WLR_OUTPUT_STATE_TRANSFORM;
+
+    if ((event->state->committed & WLR_OUTPUT_STATE_BUFFER) && event->state->buffer) {
+        lsg_immersive_client_buffer_committed(output->lsg_immersive_client);
+    }
 
     if (output->setting_state || !(event->state->committed & geometry_state)) {
         return;
@@ -911,6 +921,10 @@ static void output_destroy(struct output *output)
 static void handle_output_destroy(struct wl_listener *listener, void *data)
 {
     struct output *output = wl_container_of(listener, output, destroy);
+
+    /* the proxies on the host display go before the backend disconnects it */
+    lsg_immersive_client_destroy(output->lsg_immersive_client);
+    output->lsg_immersive_client = NULL;
 
     wl_list_remove(&output->destroy.link);
     wl_list_remove(&output->frame.link);

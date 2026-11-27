@@ -4,6 +4,7 @@ target_sources(flakewm PRIVATE
   main.cc
   server.c
   misc/gxde_identifier.cc
+  output/lsg_immersive_client/lsg_immersive_client.cc
   app_id_resolver.c
   patches/matrix.c
   patches/damage_ring.c
@@ -536,6 +537,8 @@ target_link_libraries(flakewm PRIVATE
   wlcom-protocols
   Wlroots::wlroots
   PkgConfig::WAYLAND_SERVER
+  # lsg_immersive_client is a client of the host display of the wayland backend
+  PkgConfig::WAYLAND_CLIENT
   PkgConfig::WLCOM_DEPS
   PkgConfig::SDBUS
   Threads::Threads
@@ -543,6 +546,9 @@ target_link_libraries(flakewm PRIVATE
   dl
   rt
 )
+# lsg_immersive_client needs the dde_shell client header. Its interface objects
+# already come from wlcom-protocols, so only the header generation is needed.
+add_dependencies(flakewm wlcom-client-protocol-dde-shell)
 
 if(HAVE_NLS)
   target_link_libraries(flakewm PRIVATE Intl::Intl)

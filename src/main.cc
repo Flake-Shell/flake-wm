@@ -65,6 +65,7 @@ enum LongOption : int {
   kEmergencyTermKeybind,
   kHyprUnixSocketSim,
   kGxdeLsgImmersive,
+  kLsgImmersiveClient,
 };
 
 constexpr option kLongOptions[] = {
@@ -77,6 +78,7 @@ constexpr option kLongOptions[] = {
     {"emergency-term-keybind", no_argument, nullptr, kEmergencyTermKeybind},
     {"hypr-unix-socket-sim-enable", no_argument, nullptr, kHyprUnixSocketSim},
     {"gxde-lsg-immersive", no_argument, nullptr, kGxdeLsgImmersive},
+    {"lsg-immersive-client", no_argument, nullptr, kLsgImmersiveClient},
     {nullptr, 0, nullptr, 0},
 };
 
@@ -101,6 +103,11 @@ constexpr char kUsage[] = R"(Usage: flakewm [options] [command]
                            client hotkey ever fires, including ones added at
                            runtime. Implies --no-default-keybind. VT switching
                            still works.
+      --lsg-immersive-client
+                           Nested on a Wayland host (gxde-lsg's immersive
+                           session): ask the host through dde_shell to drop the
+                           titlebar and border of the output windows and to
+                           make them fullscreen.
 
 )";
 
@@ -523,6 +530,9 @@ int Run(int argc, char* argv[]) {
         break;
       case kGxdeLsgImmersive:
         compositor.options.lsg_immersive = true;
+        break;
+      case kLsgImmersiveClient:
+        compositor.options.lsg_immersive_client = true;
         break;
       default:
         std::fputs(kUsage, stderr);

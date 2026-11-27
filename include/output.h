@@ -62,6 +62,8 @@ struct output {
      * so it is not read from or written to the output config.
      */
     bool follows_host_window;
+    /* --lsg-immersive-client: dde_shell state of the host window, or NULL */
+    struct lsg_immersive_client *lsg_immersive_client;
 
     /* Follow host-provided preferred modes on virtual DRM connectors. */
     int drm_fd;

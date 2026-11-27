@@ -29,6 +29,9 @@ struct server {
         bool enable_hypr_unix_socket_sim;
         /* --gxde-lsg-immersive: no shortcut fires, implies no_default_keybind */
         bool lsg_immersive;
+        /* --lsg-immersive-client: nested in a --gxde-lsg-immersive host, ask it through
+         * dde_shell to undecorate the host windows and make them fullscreen */
+        bool lsg_immersive_client;
     } options;
 
     struct {
