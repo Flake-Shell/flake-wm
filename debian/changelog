@@ -1,3 +1,9 @@
+flakewm (3.0.6-gxde9) lizhi; urgency=medium
+
+  * 为GXDE LSG客户端新增无边框嵌套模式
+
+ -- CharOfString <root@charofstring.cc>  Fri, 27 Nov 2026 03:00:55 -0600
+
 flakewm (3.0.6-gxde8) lizhi; urgency=medium
 
   * 为GXDE LSG新增沉浸模式
