@@ -1,3 +1,9 @@
+flakewm (3.0.6-gxde10) lizhi; urgency=medium
+
+  * 修复在重命名桌面文件时「fcitx5表现为输入后出现候选框后直接消失，同时desktop-panel输入框失去焦点——这个焦点甚至可能会被后台应用捕获，比如在后台的终端」的问题
+
+ -- CharOfString <root@charofstring.cc>  Fri, 27 Nov 2026 23:39:50 -0600
+
 flakewm (3.0.6-gxde9) lizhi; urgency=medium
 
   * 为GXDE LSG客户端新增无边框嵌套模式
