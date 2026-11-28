@@ -58,6 +58,10 @@ struct layer_shell {
     struct wlr_layer_surface_v1 *layer_surface;
     struct wlr_seat_keyboard_grab keyboard_grab;
 
+    /* the layer surface that had the keyboard before this one took it */
+    struct wlr_surface *prev_focus;
+    struct wl_listener prev_focus_destroy;
+
     struct wl_listener commit;
     struct wl_listener map;
     struct wl_listener unmap;
@@ -105,6 +109,54 @@ static const struct wlr_keyboard_grab_interface layer_shell_keyboard_grab = {
     .cancel = layer_shell_keyboard_cancel,
 };
 
+static void layer_shell_set_prev_focus(struct layer_shell *layer_shell, struct wlr_surface *surface)
+{
+    wl_list_remove(&layer_shell->prev_focus_destroy.link);
+    wl_list_init(&layer_shell->prev_focus_destroy.link);
+    layer_shell->prev_focus = surface;
+    if (surface) {
+        wl_signal_add(&surface->events.destroy, &layer_shell->prev_focus_destroy);
+    }
+}
+
+static void layer_shell_handle_prev_focus_destroy(struct wl_listener *listener, void *data)
+{
+    struct layer_shell *layer_shell = wl_container_of(listener, layer_shell, prev_focus_destroy);
+    layer_shell_set_prev_focus(layer_shell, NULL);
+}
+
+/* remember the layer surface we take the keyboard from, like the desktop
+ * icons under a desktop context menu, to give it back on unmap */
+static void layer_shell_save_prev_focus(struct layer_shell *layer_shell, struct seat *seat)
+{
+    struct wlr_surface *focused = seat->wlr_seat->keyboard_state.focused_surface;
+    if (focused == layer_shell->layer_surface->surface) {
+        return;
+    }
+    layer_shell_set_prev_focus(layer_shell,
+                               focused && wlr_layer_surface_v1_try_from_wlr_surface(focused)
+                                   ? focused
+                                   : NULL);
+}
+
+static bool layer_shell_restore_prev_focus(struct layer_shell *layer_shell, struct seat *seat)
+{
+    struct wlr_surface *prev = layer_shell->prev_focus;
+    layer_shell_set_prev_focus(layer_shell, NULL);
+    if (!prev || !prev->mapped) {
+        return false;
+    }
+
+    struct wlr_layer_surface_v1 *prev_layer = wlr_layer_surface_v1_try_from_wlr_surface(prev);
+    if (!prev_layer || prev_layer->current.keyboard_interactive ==
+                           ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE) {
+        return false;
+    }
+
+    seat_focus_surface(seat, prev);
+    return seat->wlr_seat->keyboard_state.focused_surface == prev;
+}
+
 static void layer_shell_keyboard_interactivity(struct layer_shell *layer_shell, struct seat *seat)
 {
     struct wlr_layer_surface_v1 *layer_surface = layer_shell->layer_surface;
@@ -112,6 +164,7 @@ static void layer_shell_keyboard_interactivity(struct layer_shell *layer_shell, 
 
     if (layer_surface->surface->mapped) {
         if (layer_surface->current.keyboard_interactive) {
+            layer_shell_save_prev_focus(layer_shell, seat);
             seat_focus_surface(seat, layer_surface->surface);
 
             if (wlr_seat && wlr_seat != seat->wlr_seat) {
@@ -129,10 +182,16 @@ static void layer_shell_keyboard_interactivity(struct layer_shell *layer_shell, 
         if (wlr_seat && wlr_seat->keyboard_state.grab == &layer_shell->keyboard_grab) {
             wlr_seat_keyboard_end_grab(wlr_seat);
         }
-        // XXX: auto focus layer_shell
-        if (seat->wlr_seat->keyboard_state.focused_surface == layer_surface->surface) {
+        /* the keyboard would stay on the unmapped surface if no view takes it,
+         * and the text input would follow it there */
+        if (seat->wlr_seat->keyboard_state.focused_surface == layer_surface->surface &&
+            !layer_shell_restore_prev_focus(layer_shell, seat)) {
             view_activate_topmost();
+            if (seat->wlr_seat->keyboard_state.focused_surface == layer_surface->surface) {
+                seat_focus_surface(seat, NULL);
+            }
         }
+        layer_shell_set_prev_focus(layer_shell, NULL);
     }
 }
 
@@ -445,6 +504,7 @@ static void layer_shell_handle_destroy(struct wl_listener *listener, void *data)
     wl_list_remove(&layer_shell->map.link);
     wl_list_remove(&layer_shell->unmap.link);
     wl_list_remove(&layer_shell->new_popup.link);
+    wl_list_remove(&layer_shell->prev_focus_destroy.link);
     wl_list_remove(&layer_shell->link);
 
     ky_scene_node_destroy(&layer_shell->tree->node);
@@ -529,6 +589,8 @@ static void handle_new_layer_surface(struct wl_listener *listener, void *data)
     if (!layer_shell) {
         return;
     }
+    layer_shell->prev_focus_destroy.notify = layer_shell_handle_prev_focus_destroy;
+    wl_list_init(&layer_shell->prev_focus_destroy.link);
 
     struct layer_output *layer_output = layer_output_from_wlr_output(layer_surface->output);
     wl_list_insert(&layer_output->shells[layer_surface->current.layer], &layer_shell->link);
